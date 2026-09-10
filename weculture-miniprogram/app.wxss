@@ -1,0 +1,13 @@
+page { background: #F7F6F3; color: #25211F; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; font-size: 28rpx; }
+.page { padding: 24rpx 28rpx 48rpx; box-sizing: border-box; }
+.title { font-size: 42rpx; font-weight: 700; color: #302722; }
+.subtle { color: #756B66; font-size: 25rpx; }
+.card { background: #FFFFFF; border: 1rpx solid #E6DED9; border-radius: 16rpx; padding: 24rpx; box-sizing: border-box; }
+.button-primary { background: #C5532E; color: #FFFFFF; border-radius: 12rpx; font-weight: 600; }
+.button-primary::after, .button-plain::after { border: 0; }
+.button-plain { background: #FFFFFF; border: 1rpx solid #D9CDC6; border-radius: 12rpx; color: #5C2B1B; }
+.pill { display: inline-flex; align-items: center; padding: 8rpx 16rpx; border-radius: 999rpx; background: #FDE8DD; color: #8C391D; font-size: 22rpx; }
+.empty { color: #756B66; text-align: center; padding: 96rpx 20rpx; }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin: 36rpx 0 18rpx; }
+.section-title { font-size: 32rpx; font-weight: 700; }
+.error { color: #B3261E; padding: 18rpx 0; font-size: 24rpx; }

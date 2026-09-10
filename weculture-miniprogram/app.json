@@ -1,0 +1,19 @@
+{
+  "pages": [
+    "pages/home/index", "pages/community/index", "pages/publish/index", "pages/travel/index", "pages/profile/index",
+    "pages/verify/index", "pages/detail/index", "pages/assistant/index"
+  ],
+  "window": { "navigationBarBackgroundColor": "#F7F6F3", "navigationBarTextStyle": "black", "navigationBarTitleText": "Weculture", "backgroundColor": "#F7F6F3" },
+  "tabBar": {
+    "color": "#756B66", "selectedColor": "#C5532E", "backgroundColor": "#FFFFFF", "borderStyle": "white",
+    "list": [
+      { "pagePath": "pages/home/index", "text": "首页" },
+      { "pagePath": "pages/community/index", "text": "社区" },
+      { "pagePath": "pages/publish/index", "text": "发布" },
+      { "pagePath": "pages/travel/index", "text": "旅行" },
+      { "pagePath": "pages/profile/index", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

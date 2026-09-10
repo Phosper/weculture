@@ -1,0 +1,19 @@
+# Dependencies and build output
+**/node_modules/
+**/dist/
+**/.vite/
+**/.cache/
+
+# Local environment and editor files
+*.log
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# WeChat development artifacts
+**/.wechat/
+**/miniprogram_npm/

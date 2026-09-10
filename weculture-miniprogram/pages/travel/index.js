@@ -1,0 +1,7 @@
+const { api } = require('../../services/api'); const { requireLogin } = require('../../utils/guard');
+Page({
+  data: { destination: '', days: '', preferences: ['文化'], routes: [], loading: false, error: '', options: ['文化', '美食', '自然', '艺术'] },
+  async onShow() { if (await requireLogin(this)) this.recommend(); }, input(e) { this.setData({ destination: e.detail.value }); }, chooseDays(e) { this.setData({ days: e.currentTarget.dataset.days }); }, togglePreference(e) { const value = e.currentTarget.dataset.value; const preferences = this.data.preferences.includes(value) ? this.data.preferences.filter((x) => x !== value) : [...this.data.preferences, value]; this.setData({ preferences }); },
+  async recommend() { this.setData({ loading: true, error: '' }); try { const routes = await api.post('/travel-routes/recommendations', { destination: this.data.destination, days: this.data.days, preferences: this.data.preferences }); this.setData({ routes }); } catch (error) { this.setData({ error: error.message }); } finally { this.setData({ loading: false }); } },
+  async plan(e) { const id = e.currentTarget.dataset.id; try { const result = await api.post(`/travel-routes/${id}/plans`, {}); const routes = this.data.routes.map((route) => route.id === id ? { ...route, planned: result.planned } : route); this.setData({ routes }); wx.showToast({ title: result.planned ? '已加入我的计划' : '已移出计划', icon: 'none' }); } catch (error) { wx.showToast({ title: error.message, icon: 'none' }); } }
+});
