@@ -1,5 +1,5 @@
 <view class="page">
-  <view class="hero"><view><view class="brand">Weculture</view><view class="hero-copy">在校园里，遇见文化与彼此</view></view><view class="avatar">{{user.nickname ? user.nickname.substring(0,1) : '我'}}</view></view>
+  <view class="hero"><view><view class="brand">Weculture</view><view class="hero-copy">在校园里，遇见文化与彼此</view></view><view class="avatar">{{avatarText}}</view></view>
   <view class="search"><input value="{{q}}" placeholder="搜索文化内容、话题" bindinput="searchInput" confirm-type="search" bindconfirm="search"/><text bindtap="search">搜索</text></view>
   <view wx:if="{{!user.verified}}" class="verify-card card"><view><view class="verify-title">完成校园认证，解锁校内社区</view><view class="subtle">输入学校邀请码后，可发布、报名和查看校内动态</view></view><button class="button-primary compact" bindtap="toVerify">去认证</button></view>
   <view class="service card" bindtap="toAssistant"><view class="service-mark">C</view><view><view class="service-title">校园小C</view><view class="subtle">活动、课表和校园服务的统一入口</view></view><text>›</text></view>
