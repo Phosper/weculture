@@ -1,4 +1,7 @@
 const base = process.env.API_BASE_URL || 'http://127.0.0.1:3000/api/v1';
+const adminPassword = process.env.ADMIN_INITIAL_PASSWORD || 'Weculture@2026';
+const reviewerPassword = process.env.REVIEWER_INITIAL_PASSWORD || 'Weculture@2026';
+const inviteCode = process.env.SCHOOL_INVITE_CODE || 'BLCU2026';
 const request = async (path, method = 'GET', body, token) => {
   const response = await fetch(`${base}${path}`, { method, headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
   const json = await response.json();
@@ -15,7 +18,7 @@ try {
   let restricted = false;
   try { await request('/posts?scope=school', 'GET', undefined, token); } catch { restricted = true; }
   assert(restricted, 'unverified user cannot read school feed');
-  const verified = await request('/me/school-verifications', 'POST', { code: 'BLCU2026' }, token);
+  const verified = await request('/me/school-verifications', 'POST', { code: inviteCode }, token);
   assert(verified.verified, 'invite code creates verified school membership');
   const submitted = await request('/posts', 'POST', { type: 'dynamic', title: `自动化审核 ${Date.now()}`, content: '用于验证待审核到发布的完整状态流转。', tag: '自动化测试' }, token);
   assert(submitted.status === 'pending', 'user publication enters pending review state');
@@ -24,7 +27,7 @@ try {
   try { await request('/posts', 'POST', { type: 'event', title: '无效活动', content: '这条活动不应被写入。', location: '测试地点', startsAt: '2024-01-01T09:00', endsAt: '2024-01-01T10:00', registrationDeadline: '2023-12-31T10:00', capacity: 'abc' }, token); } catch { invalidEventRejected = true; }
   const afterInvalidEvent = (await request('/me/posts', 'GET', undefined, token)).length;
   assert(invalidEventRejected && beforeInvalidEvent === afterInvalidEvent, 'invalid event is rejected before any post is created');
-  const admin = await request('/admin/auth/login', 'POST', { username: 'admin', password: 'Weculture@2026' });
+  const admin = await request('/admin/auth/login', 'POST', { username: 'admin', password: adminPassword });
   const pending = await request('/admin/posts?status=pending', 'GET', undefined, admin.token);
   assert(pending.some((post) => post.id === submitted.id), 'administrator can see pending content');
   await request(`/admin/posts/${submitted.id}/review`, 'POST', { status: 'approved' }, admin.token);
@@ -39,7 +42,7 @@ try {
   assert(planned.planned, 'route can be added to user plan');
   const assistant = await request('/assistant/messages', 'POST', { content: '怎么参加校园活动？' }, token);
   assert(Boolean(assistant.assistant?.content), 'assistant returns configured answer');
-  const reviewer = await request('/admin/auth/login', 'POST', { username: 'blcu-reviewer', password: 'Weculture@2026' });
+  const reviewer = await request('/admin/auth/login', 'POST', { username: 'blcu-reviewer', password: reviewerPassword });
   let roleBlocked = false;
   try { await request('/admin/invites', 'POST', { batchName: 'should-not-work', maxUses: 1 }, reviewer.token); } catch { roleBlocked = true; }
   assert(roleBlocked, 'reviewer cannot manage invite codes');

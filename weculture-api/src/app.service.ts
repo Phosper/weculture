@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { DataSource, Repository } from 'typeorm';
 import { AdminAccount, AssistantKnowledge, AssistantMessage, AuditLog, Event, EventRegistration, Favorite, InviteCode, Like, Post, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
 import { createToken, Session } from './auth';
+import { getSeedValue, isDemoSeedEnabled, isProduction } from './config';
 
 type UserSession = Session & { kind: 'user' };
 type AdminSession = Session & { kind: 'admin'; role?: string; schoolId?: string | null };
@@ -29,30 +30,42 @@ export class AppService implements OnModuleInit {
     private dataSource: DataSource,
   ) {}
 
-  async onModuleInit() { await this.seed(); }
+  async onModuleInit() { if (isDemoSeedEnabled()) await this.seed(); }
 
   private async seed() {
+    const adminPassword = getSeedValue('ADMIN_INITIAL_PASSWORD', 'Weculture@2026');
+    const operatorPassword = getSeedValue('OPERATOR_INITIAL_PASSWORD', 'Weculture@2026');
+    const reviewerPassword = getSeedValue('REVIEWER_INITIAL_PASSWORD', 'Weculture@2026');
+    const inviteCode = getSeedValue('SCHOOL_INVITE_CODE', 'BLCU2026');
     if (await this.schools.count()) {
       if (!await this.admins.existsBy({ username: 'blcu-reviewer' })) {
         const school = await this.schools.findOneByOrFail({ status: 'active' });
-        await this.admins.save(this.admins.create({ username: 'blcu-reviewer', passwordHash: await bcrypt.hash('Weculture@2026', 10), role: 'reviewer', schoolId: school.id }));
+        await this.admins.save(this.admins.create({ username: 'blcu-reviewer', passwordHash: await bcrypt.hash(reviewerPassword, 10), role: 'reviewer', schoolId: school.id }));
       }
       return;
     }
     const school = await this.schools.save(this.schools.create({ name: '北京语言大学', shortName: 'BLCU' }));
-    await this.invites.save(this.invites.create({ schoolId: school.id, code: 'BLCU2026', batchName: '首期内测', maxUses: 500, expiresAt: null }));
-    const admin = this.admins.create({ username: 'admin', passwordHash: await bcrypt.hash('Weculture@2026', 10), role: 'super_admin', schoolId: null });
+    await this.invites.save(this.invites.create({ schoolId: school.id, code: inviteCode, batchName: '首期内测', maxUses: 500, expiresAt: null }));
+    const admin = this.admins.create({ username: 'admin', passwordHash: await bcrypt.hash(adminPassword, 10), role: 'super_admin', schoolId: null });
     await this.admins.save(admin);
-    const operator = this.admins.create({ username: 'blcu-operator', passwordHash: await bcrypt.hash('Weculture@2026', 10), role: 'operator', schoolId: school.id });
+    const operator = this.admins.create({ username: 'blcu-operator', passwordHash: await bcrypt.hash(operatorPassword, 10), role: 'operator', schoolId: school.id });
     await this.admins.save(operator);
-    await this.admins.save(this.admins.create({ username: 'blcu-reviewer', passwordHash: await bcrypt.hash('Weculture@2026', 10), role: 'reviewer', schoolId: school.id }));
+    await this.admins.save(this.admins.create({ username: 'blcu-reviewer', passwordHash: await bcrypt.hash(reviewerPassword, 10), role: 'reviewer', schoolId: school.id }));
     const posts = await this.posts.save([
       this.posts.create({ schoolId: null, authorId: admin.id, type: 'dynamic', visibility: 'platform', status: 'approved', title: '非遗扇艺工作坊开放报名', content: '用一把团扇，认识工笔、颜色与中国传统生活美学。', tag: '非遗工坊', imageUrl: 'https://images.unsplash.com/photo-1545987796-200677ee1011?auto=format&fit=crop&w=900&q=80' }),
       this.posts.create({ schoolId: school.id, authorId: admin.id, type: 'dynamic', visibility: 'school', status: 'approved', title: '本周校园文化活动清单', content: '茶艺社体验、语言交换夜与周末故宫文化行已开放报名。', tag: '校园文化', imageUrl: 'https://images.unsplash.com/photo-1519692933481-e162a57d6721?auto=format&fit=crop&w=900&q=80' }),
       this.posts.create({ schoolId: school.id, authorId: admin.id, type: 'event', visibility: 'school', status: 'approved', title: '周末故宫文化行', content: '面向本校同学的深度文化行走活动，含讲解与交流环节。', tag: '校内活动', imageUrl: 'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=900&q=80' }),
       this.posts.create({ schoolId: school.id, authorId: admin.id, type: 'market', visibility: 'school', status: 'approved', title: '转让九成新台灯', content: '宿舍自取，使用正常，适合夜间自习。', tag: '校园闲置', imageUrl: '' })
     ]);
-    await this.events.save(this.events.create({ postId: posts[2].id, startsAt: new Date('2026-09-12T09:00:00+08:00'), endsAt: new Date('2026-09-12T17:00:00+08:00'), location: '东城区故宫博物院', registrationDeadline: new Date('2026-09-10T18:00:00+08:00'), capacity: 30 }));
+    const eventStart = new Date();
+    eventStart.setDate(eventStart.getDate() + 2);
+    eventStart.setHours(9, 0, 0, 0);
+    const eventEnd = new Date(eventStart);
+    eventEnd.setHours(17, 0, 0, 0);
+    const registrationDeadline = new Date(eventStart);
+    registrationDeadline.setHours(18, 0, 0, 0);
+    registrationDeadline.setDate(registrationDeadline.getDate() - 1);
+    await this.events.save(this.events.create({ postId: posts[2].id, startsAt: eventStart, endsAt: eventEnd, location: '东城区故宫博物院', registrationDeadline, capacity: 30 }));
     await this.routes.save([
       this.routes.create({ schoolId: null, visibility: 'platform', title: '京城文化 3 日游', destination: '北京', days: '1-3天', budget: 899, preferences: '文化,艺术', stops: '故宫 -> 南锣鼓巷 -> 慕田峪长城', highlights: '故宫讲解,胡同深度,长城索道', coverUrl: 'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?auto=format&fit=crop&w=900&q=80' }),
       this.routes.create({ schoolId: null, visibility: 'platform', title: '上海海派风情 2 日游', destination: '上海', days: '1-3天', budget: 1299, preferences: '文化,美食,艺术', stops: '外滩 -> 武康路 -> 豫园', highlights: '外滩摄影,海派建筑,本帮美食', coverUrl: 'https://images.unsplash.com/photo-1548919973-5cef591cdbc9?auto=format&fit=crop&w=900&q=80' })
@@ -73,13 +86,32 @@ export class AppService implements OnModuleInit {
 
   async userLogin(code: string) {
     if (!code?.trim()) throw new BadRequestException('缺少微信登录凭证');
-    // Development uses a persisted device identifier; production replaces this branch with code2Session.
-    const openId = code.trim().startsWith('dev-') ? code.trim().slice(0, 68) : `wechat_${code.trim().slice(0, 64)}`;
+    const openId = await this.resolveWechatOpenId(code.trim());
     let user = await this.users.findOneBy({ wechatOpenId: openId });
     if (!user) user = await this.users.save(this.users.create({ wechatOpenId: openId }));
     const membership = await this.memberships.findOneBy({ userId: user.id, verificationStatus: 'verified' });
     const token = createToken({ id: user.id, kind: 'user', schoolId: membership?.schoolId || null });
     return { token, user: await this.userSummary(user.id), isNew: !user.nickname };
+  }
+
+  private async resolveWechatOpenId(code: string) {
+    if (code.startsWith('dev-')) {
+      if (isProduction()) throw new BadRequestException('生产环境不接受开发登录标识');
+      return code.slice(0, 68);
+    }
+
+    const appId = process.env.WECHAT_APP_ID?.trim();
+    const appSecret = process.env.WECHAT_APP_SECRET?.trim();
+    if (!appId || !appSecret) {
+      if (isProduction()) throw new BadRequestException('微信登录配置不完整');
+      return `wechat_${code.slice(0, 64)}`;
+    }
+
+    const params = new URLSearchParams({ appid: appId, secret: appSecret, js_code: code, grant_type: 'authorization_code' });
+    const response = await fetch(`https://api.weixin.qq.com/sns/jscode2session?${params.toString()}`);
+    const result = await response.json() as { openid?: string; errcode?: number; errmsg?: string };
+    if (!response.ok || !result.openid) throw new BadRequestException(result.errmsg || `微信登录失败（${result.errcode || response.status}）`);
+    return result.openid;
   }
 
   async userSummary(userId: string) {

@@ -1,7 +1,8 @@
 const { api } = require('./services/api');
+const { getApiBase, getEnvironment } = require('./config');
 
 App({
-  globalData: { user: null, apiBase: 'http://127.0.0.1:3000/api/v1' },
+  globalData: { user: null, apiBase: getApiBase() },
   async ensureLogin() {
     const token = wx.getStorageSync('token');
     if (token) {
@@ -10,10 +11,14 @@ App({
     return null;
   },
   async login() {
-    // Keep one local development identity across restarts; production sends wx.login().code.
-    let developmentId = wx.getStorageSync('developmentLoginId');
-    if (!developmentId) { developmentId = `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; wx.setStorageSync('developmentLoginId', developmentId); }
-    const result = await api.post('/auth/wechat/login', { code: developmentId }, false);
+    let code;
+    if (getEnvironment() === 'develop') {
+      code = wx.getStorageSync('developmentLoginId');
+      if (!code) { code = `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; wx.setStorageSync('developmentLoginId', code); }
+    } else {
+      code = await new Promise((resolve, reject) => wx.login({ success: (result) => result.code ? resolve(result.code) : reject(new Error('未获取到微信登录凭证')), fail: reject }));
+    }
+    const result = await api.post('/auth/wechat/login', { code }, false);
     wx.setStorageSync('token', result.token); this.globalData.user = result.user; return result.user;
   }
 });

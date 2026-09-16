@@ -4,9 +4,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AdminGuard, UserGuard } from './auth';
 import { ENTITIES } from './entities';
+import { createDatabaseOptions } from './database';
 
 @Module({
-  imports: [TypeOrmModule.forRoot({ type: 'sqljs', location: 'weculture.sqlite', autoSave: true, entities: ENTITIES, synchronize: true }), TypeOrmModule.forFeature(ENTITIES)],
+  imports: [TypeOrmModule.forRoot(createDatabaseOptions()), TypeOrmModule.forFeature(ENTITIES)],
   controllers: [AppController],
   providers: [AppService, UserGuard, AdminGuard],
 })

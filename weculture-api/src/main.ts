@@ -3,9 +3,11 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ApiErrorFilter, ResponseInterceptor } from './common';
+import { corsOrigins, validateRuntimeConfig } from './config';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: { origin: true } });
+  validateRuntimeConfig();
+  const app = await NestFactory.create(AppModule, { cors: { origin: corsOrigins() } });
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.useGlobalInterceptors(new ResponseInterceptor());
   app.useGlobalFilters(new ApiErrorFilter());

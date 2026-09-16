@@ -3,6 +3,7 @@
 **/dist/
 **/.vite/
 **/.cache/
+weculture-api/*.sqlite*
 
 # Local environment and editor files
 *.log

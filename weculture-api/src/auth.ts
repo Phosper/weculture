@@ -1,11 +1,10 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtPayload, verify, sign } from 'jsonwebtoken';
+import { getJwtSecret } from './config';
 
 export type Session = { id: string; kind: 'user' | 'admin'; role?: string; schoolId?: string | null };
-const secret = () => process.env.JWT_SECRET || 'weculture-local-development-secret';
-
-export const createToken = (session: Session) => sign(session, secret(), { expiresIn: '8h' });
-export const readToken = (token: string): Session => verify(token, secret()) as JwtPayload as Session;
+export const createToken = (session: Session) => sign(session, getJwtSecret(), { expiresIn: '8h' });
+export const readToken = (token: string): Session => verify(token, getJwtSecret()) as JwtPayload as Session;
 
 @Injectable()
 export class UserGuard implements CanActivate {

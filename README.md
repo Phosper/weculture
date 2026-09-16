@@ -37,7 +37,14 @@ npm run dev
 
 ## 验证
 
-API 服务启动后，可执行：
+不依赖本地数据文件的集成测试：
+
+```powershell
+cd weculture-api
+npm test
+```
+
+API 服务启动后，还可执行端到端自测：
 
 ```powershell
 cd weculture-api
@@ -48,4 +55,8 @@ npm run self-test
 
 ## 开发数据库
 
-本地使用 `weculture-api/weculture.sqlite`，因为当前环境未提供容器运行时。实体模型、`schoolId` 行级隔离和服务边界均以 MySQL 部署为目标；生产部署时需改为 MySQL 数据源并使用正式迁移，禁止开启 TypeORM 的 `synchronize`。
+本地使用未纳入 Git 的 `weculture-api/weculture.sqlite`。生产环境仅允许 MySQL，并且强制关闭 TypeORM `synchronize`，通过版本化迁移建表。
+
+## 生产部署
+
+生产环境不包含真实密钥或域名。复制 `weculture-api/.env.example` 到部署平台的密钥管理中，配置 MySQL、长度不少于 32 位的随机 `JWT_SECRET`、微信 AppID/AppSecret 和后台 CORS 域名，然后先执行 `npm run migration:run` 再启动 API。完整步骤见 [部署检查清单.md](部署检查清单.md)。
