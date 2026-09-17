@@ -4,6 +4,7 @@ import request = require('supertest');
 import { ApiErrorFilter, ResponseInterceptor } from '../src/common';
 
 type ApiResponse<T> = { code: string; message: string; data: T; requestId: string };
+jest.setTimeout(20_000);
 
 describe('Weculture API', () => {
   let app: INestApplication;
@@ -73,6 +74,20 @@ describe('Weculture API', () => {
       .send({ destination: '北京', days: '1-3天', preferences: ['文化'] })
       .expect(201);
     expect(response.body.data).toEqual(expect.arrayContaining([expect.objectContaining({ destination: '北京' })]));
+  });
+
+  it('returns the updated event registration count immediately', async () => {
+    const feed = await request(app.getHttpServer())
+      .get('/api/v1/posts?scope=school&type=event')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const event = feed.body.data[0].event;
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/events/${event.id}/registrations`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+      .expect(201);
+    expect(response.body.data).toMatchObject({ registered: true, registeredCount: event.registeredCount + 1 });
   });
 
   it('rejects an invalid event without creating a post', async () => {

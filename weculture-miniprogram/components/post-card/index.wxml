@@ -1,7 +1,7 @@
 <view class="post card" bindtap="open">
   <image wx:if="{{post.imageUrl}}" class="cover" src="{{post.imageUrl}}" mode="aspectFill" />
-  <view class="post-top"><view class="pill">{{post.tag || '校园动态'}}</view><text class="time">{{post.createdAt}}</text></view>
+  <view class="post-top"><view class="pill">{{post.tag || '校园动态'}}</view><text class="time">{{post.createdAtText}}</text></view>
   <view class="post-title">{{post.title}}</view><view class="post-content">{{post.content}}</view>
-  <view wx:if="{{post.event}}" class="event"><view><text class="event-name">{{post.event.location}}</text><text>{{post.event.startsAt}}</text></view><text class="event-action">{{post.event.registered ? '已报名' : '可报名'}}</text></view>
+  <view wx:if="{{post.event}}" class="event"><view><text class="event-name">{{post.event.location}}</text><text>{{post.event.startsAtText}}</text></view><text class="event-action">{{post.event.registered ? '已报名' : '可报名'}}</text></view>
   <view class="post-bottom"><view class="author">{{post.author.nickname}}</view><view class="actions"><text catchtap="like">{{post.liked ? '已赞' : '点赞'}} {{post.likeCount}}</text><text catchtap="favorite">{{post.favorited ? '已收藏' : '收藏'}}</text></view></view>
 </view>

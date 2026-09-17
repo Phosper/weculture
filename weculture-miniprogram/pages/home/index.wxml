@@ -5,4 +5,5 @@
   <view class="service card" bindtap="toAssistant"><view class="service-mark">C</view><view><view class="service-title">校园小C</view><view class="subtle">活动、课表和校园服务的统一入口</view></view><text>›</text></view>
   <view class="section-head"><text class="section-title">平台精选</text><text class="more" bindtap="toCommunity">校内社区 ›</text></view>
   <view wx:if="{{loading}}" class="empty">正在加载内容...</view><view wx:if="{{error}}" class="error">{{error}}</view><post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" />
+  <view wx:if="{{!loading && !error && !posts.length}}" class="empty">{{q ? '没有找到相关内容，试试其他关键词' : '暂无平台精选内容'}}</view>
 </view>

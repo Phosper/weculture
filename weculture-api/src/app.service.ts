@@ -189,10 +189,10 @@ export class AppService implements OnModuleInit {
   async registerEvent(session: UserSession, eventId: string) {
     await this.currentUser(session); const event = await this.events.findOneBy({ id: eventId }); if (!event) throw new NotFoundException('活动不存在'); const post = await this.visiblePost(event.postId, session.id); await this.verifiedMembership(session.id);
     if (event.status !== 'active' || event.registrationDeadline < new Date()) throw new ConflictException('活动当前不可报名'); if (event.registeredCount >= event.capacity) throw new ConflictException('活动已满员');
-    if (await this.registrations.existsBy({ eventId, userId: session.id, status: 'registered' })) return { registered: true, message: '已报名' };
+    if (await this.registrations.existsBy({ eventId, userId: session.id, status: 'registered' })) return { registered: true, registeredCount: event.registeredCount, message: '已报名' };
     await this.registrations.save(this.registrations.create({ eventId, userId: session.id })); event.registeredCount += 1; await this.events.save(event);
     const plan = await this.plans.findOneBy({ userId: session.id, targetType: 'event', targetId: eventId }); if (!plan) await this.plans.save(this.plans.create({ userId: session.id, targetType: 'event', targetId: eventId }));
-    return { registered: true, eventId, postId: post.id };
+    return { registered: true, registeredCount: event.registeredCount, eventId, postId: post.id };
   }
   async cancelEvent(session: UserSession, eventId: string) {
     const registration = await this.registrations.findOneBy({ eventId, userId: session.id, status: 'registered' }); if (!registration) throw new NotFoundException('未找到报名记录'); const event = await this.events.findOneByOrFail({ id: eventId }); registration.status = 'cancelled'; event.registeredCount = Math.max(0, event.registeredCount - 1); await this.registrations.save(registration); await this.events.save(event); const plan = await this.plans.findOneBy({ userId: session.id, targetType: 'event', targetId: eventId }); if (plan) { plan.status = 'cancelled'; await this.plans.save(plan); } return { registered: false };
