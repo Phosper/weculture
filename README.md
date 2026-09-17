@@ -60,3 +60,5 @@ npm run self-test
 ## 生产部署
 
 生产环境不包含真实密钥或域名。复制 `weculture-api/.env.example` 到部署平台的密钥管理中，配置 MySQL、长度不少于 32 位的随机 `JWT_SECRET`、微信 AppID/AppSecret 和后台 CORS 域名，然后先执行 `npm run migration:run` 再启动 API。完整步骤见 [部署检查清单.md](部署检查清单.md)。
+
+需要让队友在各自手机上测试时，按 [手机体验版部署说明.md](手机体验版部署说明.md) 部署微信云托管测试环境并上传体验版。

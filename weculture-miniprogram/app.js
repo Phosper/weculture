@@ -1,8 +1,11 @@
 const { api } = require('./services/api');
-const { getApiBase, getEnvironment } = require('./config');
+const { getApiBase, getCloudConfig, getEnvironment } = require('./config');
 
 App({
-  globalData: { user: null, apiBase: getApiBase() },
+  globalData: { user: null, apiBase: getApiBase(), cloudConfig: getCloudConfig() },
+  onLaunch() {
+    if (this.globalData.cloudConfig && wx.cloud) wx.cloud.init({ traceUser: true });
+  },
   async ensureLogin() {
     const token = wx.getStorageSync('token');
     if (token) {

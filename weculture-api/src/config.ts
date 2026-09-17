@@ -39,7 +39,9 @@ export function getSeedValue(name: string, developmentFallback: string) {
 
 export function corsOrigins() {
   if (!isProduction()) return true;
-  const origins = required('CORS_ORIGINS').split(',').map((origin) => origin.trim()).filter(Boolean);
+  const configured = process.env.CORS_ORIGINS?.trim();
+  if (!configured) return false;
+  const origins = configured.split(',').map((origin) => origin.trim()).filter(Boolean);
   if (!origins.length || origins.some((origin) => !origin.startsWith('https://'))) throw new Error('生产环境 CORS_ORIGINS 必须是 HTTPS 域名列表');
   return origins;
 }
