@@ -29,7 +29,7 @@ export class InitialSchema1789560000000 implements MigrationInterface {
       new Table({ name: 'assistant_knowledge', columns: [...baseColumns, text('schoolId', { length: '36', isNullable: true }), text('question'), { name: 'keywords', type: 'text' }, { name: 'answer', type: 'text' }, text('status', { default: "'active'" })] }),
       new Table({ name: 'assistant_messages', columns: [...baseColumns, text('userId', { length: '36' }), text('schoolId', { length: '36', isNullable: true }), text('role'), { name: 'content', type: 'text' }] }),
       new Table({ name: 'admin_accounts', columns: [...baseColumns, text('username', { isUnique: true }), text('passwordHash'), text('role', { default: "'operator'" }), text('schoolId', { length: '36', isNullable: true }), text('status', { default: "'active'" })] }),
-      new Table({ name: 'audit_logs', columns: [...baseColumns, text('adminId', { length: '36' }), text('schoolId', { length: '36', isNullable: true }), text('action'), text('resourceType'), text('resourceId', { length: '36' }), text('result', { default: "'success'" }), { name: 'detail', type: 'text', default: "''" }] }),
+      new Table({ name: 'audit_logs', columns: [...baseColumns, text('adminId', { length: '36' }), text('schoolId', { length: '36', isNullable: true }), text('action'), text('resourceType'), text('resourceId', { length: '36' }), text('result', { default: "'success'" }), { name: 'detail', type: 'text' }] }),
     ];
 
     for (const table of tables) await queryRunner.createTable(table, true);

@@ -138,7 +138,7 @@ export class AuditLog extends BaseEntity {
   @Column() resourceType!: string;
   @Column() resourceId!: string;
   @Column({ default: 'success' }) result!: string;
-  @Column('text', { default: '' }) detail!: string;
+  @Column('text') detail!: string;
 }
 
 export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog];
