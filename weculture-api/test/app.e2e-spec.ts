@@ -52,6 +52,15 @@ describe('Weculture API', () => {
     expect(restricted.body.message).toContain('学校认证');
   });
 
+  it('uses the trusted OpenID supplied by WeChat Cloud Run', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/wechat/login')
+      .set('x-wx-openid', `cloud-e2e-${Date.now()}`)
+      .send({})
+      .expect(201);
+    expect((response.body as ApiResponse<{ token: string }>).data.token).toBeTruthy();
+  });
+
   it('verifies the school membership and exposes the school feed', async () => {
     const verified = await request(app.getHttpServer())
       .post('/api/v1/me/school-verifications')

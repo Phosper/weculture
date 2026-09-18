@@ -84,9 +84,11 @@ export class AppService implements OnModuleInit {
   private ensureAdminScope(admin: AdminSession, schoolId: string | null) { if (admin.role !== 'super_admin' && (!schoolId || admin.schoolId !== schoolId)) throw new ForbiddenException('无权操作该学校资源'); }
   private requireAdminRole(admin: AdminSession, ...roles: Array<NonNullable<AdminSession['role']>>) { if (!admin.role || !roles.includes(admin.role)) throw new ForbiddenException('当前管理员角色无权执行此操作'); }
 
-  async userLogin(code: string) {
-    if (!code?.trim()) throw new BadRequestException('缺少微信登录凭证');
-    const openId = await this.resolveWechatOpenId(code.trim());
+  async userLogin(code?: string, cloudOpenId?: string) {
+    const trustedOpenId = cloudOpenId?.trim();
+    if (trustedOpenId && trustedOpenId.length > 128) throw new BadRequestException('微信用户标识无效');
+    if (!trustedOpenId && !code?.trim()) throw new BadRequestException('缺少微信登录凭证');
+    const openId = trustedOpenId || await this.resolveWechatOpenId(code!.trim());
     let user = await this.users.findOneBy({ wechatOpenId: openId });
     if (!user) user = await this.users.save(this.users.create({ wechatOpenId: openId }));
     const membership = await this.memberships.findOneBy({ userId: user.id, verificationStatus: 'verified' });

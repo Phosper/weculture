@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AdminGuard, UserGuard } from './auth';
 
@@ -7,7 +7,10 @@ export class AppController {
   constructor(private readonly service: AppService) {}
 
   @Get('health') health() { return this.service.health(); }
-  @Post('auth/wechat/login') login(@Body() body: { code: string }) { return this.service.userLogin(body.code); }
+  @Post('auth/wechat/login')
+  login(@Body() body: { code?: string }, @Headers('x-wx-openid') cloudOpenId?: string) {
+    return this.service.userLogin(body.code, cloudOpenId);
+  }
   @Post('auth/refresh') refresh(@Body() body: { token: string }) { return { token: body.token }; }
 
   @UseGuards(UserGuard)
