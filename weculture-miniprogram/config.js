@@ -7,7 +7,7 @@ const apiBases = {
 // 手机体验版优先使用微信云托管，避免另外购买服务器和配置 request 合法域名。
 // 创建云托管环境后，只需填写对应环境的 env；service 默认使用 weculture-api。
 const cloudContainers = {
-  trial: { env: '', service: 'weculture-api', pathPrefix: '/api/v1' },
+  trial: { env: 'weculture-test-d4g8lhclj2cb27224', service: 'weculture-api', pathPrefix: '/api/v1' },
   release: { env: '', service: 'weculture-api', pathPrefix: '/api/v1' }
 };
 
