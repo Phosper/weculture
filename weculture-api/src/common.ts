@@ -1,8 +1,26 @@
-import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Injectable, NestInterceptor, CallHandler, Logger } from '@nestjs/common';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Injectable, NestInterceptor, CallHandler, Logger, ExecutionContext } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { defer, retry, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 export const ok = <T>(data: T, message = 'ok') => ({ code: 'OK', message, data });
+
+@Injectable()
+export class RetryTransientReadInterceptor implements NestInterceptor {
+  intercept(context: ExecutionContext, next: CallHandler) {
+    if (context.switchToHttp().getRequest().method !== 'GET') return next.handle();
+    return defer(() => next.handle()).pipe(retry({
+      count: 1,
+      delay: (error: unknown) => {
+        const failure = error as { code?: string; driverError?: { code?: string } };
+        const code = failure?.driverError?.code || failure?.code;
+        if (code !== 'ECONNRESET' && code !== 'PROTOCOL_CONNECTION_LOST') throw error;
+        Logger.warn(`Retrying GET after transient database disconnect (${code})`, RetryTransientReadInterceptor.name);
+        return timer(200);
+      },
+    }));
+  }
+}
 
 @Injectable()
 export class ResponseInterceptor implements NestInterceptor {
