@@ -76,6 +76,37 @@ describe('Weculture API', () => {
     expect(feed.body.data.some((post: { visibility: string }) => post.visibility === 'school')).toBe(true);
   });
 
+  it('finds visible posts by the Weculture author name', async () => {
+    const response = await request(app.getHttpServer())
+      .get('/api/v1/posts?q=Weculture')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(response.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ title: '非遗扇艺工作坊开放报名', visibility: 'platform', author: expect.objectContaining({ nickname: 'Weculture' }) }),
+      expect.objectContaining({ title: '本周校园文化活动清单', visibility: 'school', author: expect.objectContaining({ nickname: 'Weculture' }) }),
+    ]));
+  });
+
+  it('lists posts saved by the current user', async () => {
+    const feed = await request(app.getHttpServer())
+      .get('/api/v1/posts?scope=school')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    const postId = feed.body.data[0].id;
+    await request(app.getHttpServer())
+      .post(`/api/v1/posts/${postId}/favorite`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({})
+      .expect(201);
+    const saved = await request(app.getHttpServer())
+      .get('/api/v1/me/favorites')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(saved.body.data).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'post', data: expect.objectContaining({ id: postId, favorited: true }) }),
+    ]));
+  });
+
   it('returns travel recommendations', async () => {
     const response = await request(app.getHttpServer())
       .post('/api/v1/travel-routes/recommendations')

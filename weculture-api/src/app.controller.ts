@@ -23,6 +23,8 @@ export class AppController {
   @Get('me/plans') plans(@Req() req: { user: any }) { return this.service.myPlans(req.user); }
   @UseGuards(UserGuard)
   @Get('me/posts') myPosts(@Req() req: { user: any }) { return this.service.myPosts(req.user); }
+  @UseGuards(UserGuard)
+  @Get('me/favorites') myFavorites(@Req() req: { user: any }) { return this.service.myFavorites(req.user); }
 
   @UseGuards(UserGuard)
   @Get('posts') posts(@Req() req: { user: any }, @Query() query: any) { return this.service.listPosts(req.user, query); }

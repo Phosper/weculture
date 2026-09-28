@@ -42,6 +42,7 @@ export class AppService implements OnModuleInit {
         const school = await this.schools.findOneByOrFail({ status: 'active' });
         await this.admins.save(this.admins.create({ username: 'blcu-reviewer', passwordHash: await bcrypt.hash(reviewerPassword, 10), role: 'reviewer', schoolId: school.id }));
       }
+      await this.seedDesignContent();
       return;
     }
     const school = await this.schools.save(this.schools.create({ name: '北京语言大学', shortName: 'BLCU' }));
@@ -75,6 +76,26 @@ export class AppService implements OnModuleInit {
       this.knowledge.create({ schoolId: school.id, question: '如何参加校园活动？', keywords: '活动,报名,讲座', answer: '进入“社区”查看校内活动，打开详情后点击报名即可。报名成功后会进入“我的计划”。' }),
       this.knowledge.create({ schoolId: null, question: '有什么文化旅行推荐？', keywords: '旅行,路线,文化', answer: '你可以在“旅行”页选择目的地、天数和偏好，我会基于平台路线库给出推荐。' })
     ]);
+    await this.seedDesignContent();
+  }
+
+  private async seedDesignContent() {
+    const admin = await this.admins.findOneBy({ username: 'admin' });
+    const school = await this.schools.findOneBy({ shortName: 'BLCU' });
+    if (!admin || !school) return;
+    const samples: Array<{ title: string; content: string; tag: string; type: Post['type']; visibility: Post['visibility']; schoolId: string | null; imageUrl: string }> = [
+      { title: '沉浸式体验非遗：我们在校园里办了一场茶艺社！', content: '从闻香、温杯到冲泡，在校园里认识茶文化的日常之美。', tag: '文化大使', type: 'dynamic', visibility: 'platform', schoolId: null, imageUrl: 'asset://photo-tea-ceremony.jpg' },
+      { title: '当水墨遇见极简主义：我的毕业展倒计时。', content: '用水墨的留白，重新讲述年轻人的视觉语言。', tag: '文化传承', type: 'dynamic', visibility: 'platform', schoolId: null, imageUrl: 'asset://photo-ink-painting.jpg' },
+      { title: '剪纸艺术进校园，这就是指尖上的中国魅力！', content: '一张红纸、一把剪刀，剪出传统技艺的新故事。', tag: '非遗工坊', type: 'dynamic', visibility: 'platform', schoolId: null, imageUrl: 'asset://photo-paper-cutting.jpg' },
+      { title: '寻找校园里的“梁思成”：中式古建的结构之美。', content: '从斗拱到飞檐，一起观察建筑背后的文化记忆。', tag: '古建探秘', type: 'dynamic', visibility: 'platform', schoolId: null, imageUrl: 'asset://photo-ancient-architecture.jpg' },
+      { title: '校园网连接问题互助帖', content: '校园网连接失败时，先检查网络设置与学校官方通知；也欢迎同学在评论区分享经验。', tag: '互助', type: 'dynamic', visibility: 'school', schoolId: school.id, imageUrl: '' },
+      { title: '转让闲置 iPhone 充电器', content: '九成新，面交自取，价格 ¥15。', tag: '闲置 · ¥15', type: 'market', visibility: 'school', schoolId: school.id, imageUrl: 'asset://photo-iphone-charger.jpg' }
+    ];
+    for (const sample of samples) {
+      if (!await this.posts.existsBy({ title: sample.title })) {
+        await this.posts.save(this.posts.create({ ...sample, authorId: admin.id, status: 'approved' }));
+      }
+    }
   }
 
   private async currentUser(session: UserSession) { const user = await this.users.findOneBy({ id: session.id }); if (!user || user.status !== 'active') throw new ForbiddenException('账号不可用'); return user; }
@@ -147,9 +168,10 @@ export class AppService implements OnModuleInit {
     else if (query.scope === 'platform') { qb.andWhere('post.visibility = :platform', { platform: 'platform' }); }
     else { qb.andWhere('(post.visibility = :platform OR (post.visibility = :school AND post.schoolId = :schoolId))', { platform: 'platform', school: 'school', schoolId: member?.schoolId || '__none__' }); }
     if (query.type) qb.andWhere('post.type = :type', { type: query.type });
-    if (query.q) qb.andWhere('(post.title LIKE :q OR post.content LIKE :q OR post.tag LIKE :q)', { q: `%${query.q}%` });
     const posts = await qb.orderBy('post.createdAt', 'DESC').getMany();
-    return Promise.all(posts.map((post) => this.decoratePost(post, session.id)));
+    const decorated = await Promise.all(posts.map((post) => this.decoratePost(post, session.id)));
+    const search = query.q?.trim().toLocaleLowerCase();
+    return search ? decorated.filter((post) => [post.title, post.content, post.tag, post.author.nickname].some((value) => value?.toLocaleLowerCase().includes(search))) : decorated;
   }
 
   async getPost(session: UserSession, postId: string) { await this.currentUser(session); return this.decoratePost(await this.visiblePost(postId, session.id, true), session.id); }
@@ -205,6 +227,18 @@ export class AppService implements OnModuleInit {
   private async decorateRoute(route: TravelRoute, userId: string) { const [planned, favorited] = await Promise.all([this.plans.existsBy({ userId, targetType: 'route', targetId: route.id, status: 'active' }), this.favorites.existsBy({ userId, targetType: 'route', targetId: route.id })]); return { ...route, preferences: route.preferences.split(','), stops: route.stops.split(' -> '), highlights: route.highlights.split(','), planned, favorited }; }
   async togglePlan(session: UserSession, routeId: string) { await this.currentUser(session); await this.getRoute(routeId, session.id); const plan = await this.plans.findOneBy({ userId: session.id, targetType: 'route', targetId: routeId }); if (plan?.status === 'active') { plan.status = 'cancelled'; await this.plans.save(plan); return { planned: false }; } if (plan) { plan.status = 'active'; await this.plans.save(plan); } else await this.plans.save(this.plans.create({ userId: session.id, targetType: 'route', targetId: routeId })); return { planned: true }; }
   async myPlans(session: UserSession) { await this.currentUser(session); const plans = await this.plans.findBy({ userId: session.id, status: 'active' }); const items = await Promise.all(plans.map(async (plan) => { if (plan.targetType === 'route') { const route = await this.routes.findOneBy({ id: plan.targetId }); return route ? { type: 'route', ...await this.decorateRoute(route, session.id) } : null; } const event = await this.events.findOneBy({ id: plan.targetId }); const post = event ? await this.posts.findOneBy({ id: event.postId }) : null; return event && post ? { type: 'event', id: event.id, title: post.title, startsAt: event.startsAt, location: event.location, status: event.status } : null; })); return items.filter(Boolean); }
+  async myFavorites(session: UserSession) {
+    await this.currentUser(session);
+    const favorites = await this.favorites.findBy({ userId: session.id });
+    const items: Array<{ type: string; data: unknown }> = [];
+    for (const favorite of favorites) {
+      try {
+        if (favorite.targetType === 'post') items.push({ type: 'post', data: await this.getPost(session, favorite.targetId) });
+        if (favorite.targetType === 'route') items.push({ type: 'route', data: await this.decorateRoute(await this.getRoute(favorite.targetId, session.id), session.id) });
+      } catch { /* Hidden or deleted content is omitted. */ }
+    }
+    return items;
+  }
 
   async quickActions(session: UserSession) { await this.currentUser(session); const member = await this.memberships.findOneBy({ userId: session.id, verificationStatus: 'verified' }); const kb = (await this.knowledge.findBy({ status: 'active' })).filter((item) => item.schoolId === null || item.schoolId === member?.schoolId); return kb.map(({ id, question }) => ({ id, label: question })); }
   async assistantMessage(session: UserSession, content: string) { await this.currentUser(session); if (!content.trim() || content.length > 500) throw new BadRequestException('请输入1至500字的问题'); const member = await this.memberships.findOneBy({ userId: session.id, verificationStatus: 'verified' }); await this.messages.save(this.messages.create({ userId: session.id, schoolId: member?.schoolId || null, role: 'user', content })); const candidates = (await this.knowledge.findBy({ status: 'active' })).filter((item) => item.schoolId === null || item.schoolId === member?.schoolId); const normalized = content.toLowerCase(); const match = candidates.find((item) => item.keywords.split(',').some((keyword) => normalized.includes(keyword.trim().toLowerCase()))); const answer = match?.answer || '这项信息暂未收录。校园实时信息请以学校官方渠道为准，我可以继续帮你查找已配置的校园活动、课程或文化旅行问题。'; const message = await this.messages.save(this.messages.create({ userId: session.id, schoolId: member?.schoolId || null, role: 'assistant', content: answer })); return { user: content, assistant: { id: message.id, content: answer, createdAt: message.createdAt } };
