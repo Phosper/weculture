@@ -243,7 +243,18 @@ export class AppService implements OnModuleInit {
     const capacity = Number(merged.capacity), location = String(merged.location || '').trim();
     const unchangedSchedule = previous && +startsAt === +previous.startsAt && +endsAt === +previous.endsAt && +registrationDeadline === +previous.registrationDeadline;
     if (Number.isNaN(+startsAt) || Number.isNaN(+endsAt) || Number.isNaN(+registrationDeadline) || !location || location.length > 200 || !Number.isInteger(capacity) || capacity < Math.max(1, previous?.registeredCount || 0) || startsAt >= endsAt || registrationDeadline >= startsAt || (!unchangedSchedule && (registrationDeadline <= new Date() || startsAt <= new Date()))) throw new BadRequestException('活动信息不完整、人数无效或时间已过期');
-    return { startsAt, endsAt, registrationDeadline, location, capacity };
+    const requestedStatus = merged.eventStatus === undefined ? (previous?.status || 'active') : String(merged.eventStatus);
+    const status = ['active', 'changed', 'cancelled'].includes(requestedStatus) ? requestedStatus as Event['status'] : (previous?.status || 'active');
+    const changeNote = String(merged.changeNote || '').trim();
+    const cancellationReason = String(merged.cancellationReason || '').trim();
+    if (changeNote.length > 500 || cancellationReason.length > 500) throw new BadRequestException('活动变更说明最多500字');
+    const statusChanged = !previous || status !== previous.status;
+    if (statusChanged && status === 'changed' && !changeNote) throw new BadRequestException('活动变更请填写说明');
+    if (statusChanged && status === 'cancelled' && !cancellationReason) throw new BadRequestException('取消活动请填写原因');
+    const scheduleChanged = previous && (+startsAt !== +previous.startsAt || +endsAt !== +previous.endsAt || +registrationDeadline !== +previous.registrationDeadline || location !== previous.location || capacity !== previous.capacity);
+    const noteChanged = previous && (changeNote !== previous.changeNote || cancellationReason !== previous.cancellationReason);
+    const changedAt = previous && (status !== previous.status || scheduleChanged || noteChanged) ? new Date() : (previous?.changedAt || null);
+    return { startsAt, endsAt, registrationDeadline, location, capacity, status, changeNote, cancellationReason, changedAt };
   }
 
   async userLogin(code?: string, cloudOpenId?: string) {

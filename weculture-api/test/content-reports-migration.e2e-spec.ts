@@ -9,6 +9,7 @@ import { PostComments1792458000000 } from '../src/migrations/1792458000000-PostC
 import { ContentReports1793000000000 } from '../src/migrations/1793000000000-ContentReports';
 import { FeaturedPosts1793000001000 } from '../src/migrations/1793000001000-FeaturedPosts';
 import { AnalyticsEvents1793000002000 } from '../src/migrations/1793000002000-AnalyticsEvents';
+import { EventChanges1793000003000 } from '../src/migrations/1793000003000-EventChanges';
 
 const migrations = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000, ContentReports1793000000000];
 const fixture = { reporterId: 'user-a', schoolId: null, targetType: 'post' as const, targetId: 'post-a', postId: 'post-a', reason: 'spam', detail: '', status: 'pending' as const, handledBy: null, handledAt: null, resolution: '' };
@@ -73,7 +74,7 @@ describe('Content reports migration', () => {
     try {
       for (const type of ['mysql', 'sqljs']) {
         process.env.NODE_ENV = 'development'; process.env.DB_TYPE = type;
-        expect(createDataSourceOptions().migrations).toEqual([...migrations, FeaturedPosts1793000001000, AnalyticsEvents1793000002000]);
+        expect(createDataSourceOptions().migrations).toEqual([...migrations, FeaturedPosts1793000001000, AnalyticsEvents1793000002000, EventChanges1793000003000]);
       }
     } finally {
       for (const [key, value] of Object.entries(previous)) if (value === undefined) delete process.env[key]; else process.env[key] = value;

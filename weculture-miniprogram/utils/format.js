@@ -32,6 +32,10 @@ function formatEvent(event, postStatus = 'approved') {
   const ended = new Date(event.endsAt).getTime() <= now;
   const deadlinePassed = new Date(event.registrationDeadline).getTime() <= now;
   const full = event.registeredCount >= event.capacity;
+  const changeNote = typeof event.changeNote === 'string' ? event.changeNote.trim() : '';
+  const cancellationReason = typeof event.cancellationReason === 'string' ? event.cancellationReason.trim() : '';
+  const changeNotice = event.status === 'cancelled' ? (cancellationReason || '活动已取消')
+    : event.status === 'changed' ? (changeNote || '活动安排有变更，请留意最新信息') : '';
   const eventStatusText = event.status === 'cancelled' ? '活动已取消'
     : event.status === 'changed' ? '活动安排有变更，请留意最新信息'
       : ended ? '活动已结束' : deadlinePassed ? '报名已截止' : full ? '名额已满' : '报名中';
@@ -41,6 +45,10 @@ function formatEvent(event, postStatus = 'approved') {
     startsAtText: formatDateTime(event.startsAt),
     endsAtText: formatDateTime(event.endsAt),
     registrationDeadlineText: formatDateTime(event.registrationDeadline),
+    changedAtText: formatDateTime(event.changedAt),
+    changeNote,
+    cancellationReason,
+    changeNotice,
     eventStatusText,
     eventNextStep: event.status === 'cancelled' ? '活动已取消，可取消报名并移出计划。' : event.status === 'changed' ? '安排有变更，请点击卡片核对最新时间和地点。' : ended ? '活动已结束，可查看详情或取消报名移出计划。' : '点击卡片查看最新安排，按活动时间和地点参加。',
     cancelable: postStatus === 'approved' && registered,

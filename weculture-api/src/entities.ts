@@ -76,6 +76,9 @@ export class Event extends BaseEntity {
   @Column({ default: 30 }) capacity!: number;
   @Column({ default: 0 }) registeredCount!: number;
   @Column({ default: 'active' }) status!: 'active' | 'changed' | 'cancelled';
+  @Column({ type: 'varchar', length: 500, default: '' }) changeNote!: string;
+  @Column({ type: 'datetime', nullable: true }) changedAt!: Date | null;
+  @Column({ type: 'varchar', length: 500, default: '' }) cancellationReason!: string;
 }
 
 @Entity('post_comments')

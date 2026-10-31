@@ -13,6 +13,8 @@
 .content { font-size: calc(28rpx * var(--font-scale, 1)); line-height: 1.75; margin: 34rpx 0; white-space: pre-wrap; word-break: break-all; }
 .event { padding: 27rpx; }
 .event-title { font-size: calc(28rpx * var(--font-scale, 1)); font-weight: 700; color: #C5532E; margin-bottom: 20rpx; }
+.event-change { display: flex; flex-direction: column; gap: 6rpx; margin: -6rpx 0 16rpx; padding: 14rpx 16rpx; border-radius: 10rpx; background: #FCF6F1; color: #9A362B; font-size: calc(22rpx * var(--font-scale, 1)); line-height: 1.6; word-break: break-all; }
+.event-change-time { color: #87756B; font-size: calc(20rpx * var(--font-scale, 1)); }
 .event-detail { display: flex; gap: 20rpx; justify-content: space-between; padding: 9rpx 0; border-bottom: 1rpx solid #E7E5E2; font-size: calc(23rpx * var(--font-scale, 1)); }
 .event-detail text:first-child { flex-shrink: 0; color: #79747E; }
 .event-detail text:last-child { flex: 1; min-width: 0; text-align: right; word-break: break-all; }

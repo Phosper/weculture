@@ -120,6 +120,14 @@
 - 后台新增“数据统计”界面；读取审计、导出、原始事件清理、日聚合表和 `session_started` 回访事件未实现。
 - 本地检查：`test/analytics.e2e-spec.ts`（事件写入、去重、日期聚合、学校范围、权限、日期校验）、`test/analytics-migration.e2e-spec.ts`（可逆、唯一索引、MySQL SQL）。未部署、未访问真实 MySQL。
 
+## 活动变更与取消说明：2026-11-01 本地实现，待配套发布
+
+- `events` 新增 `changeNote`（varchar 500，默认空）、`changedAt`（datetime 可空）、`cancellationReason`（varchar 500，默认空）；迁移 `1793000003000-EventChanges` 可逆，旧活动默认空说明。
+- 后台 `PATCH /api/v1/admin/posts/:id` 可编辑活动时间／地点／名额，并传 `eventStatus: active|changed|cancelled`、`changeNote`、`cancellationReason`。变更必须填写说明，取消必须填写原因；说明最多500字；保留历史报名人数，变更或取消时更新 `changedAt`。
+- `GET /api/v1/posts/:id` 的 `event` 增加 `changeNote`、`changedAt`、`cancellationReason`；详情页展示变更／取消提示和更新时间。推送、已读状态和“我的计划”专属提示未实现。
+- 内容关联（笔记到活动／路线）仍仅设计，未新增 `post_relations` 表或接口。
+- 本地检查：`test/event-changes.e2e-spec.ts`（变更、取消、空说明拒绝、字段保留）、`test/event-changes-migration.e2e-spec.ts`（加列/回退/MySQL SQL）；小程序 `test/event-change.test.js`（展示和回退文案）。未部署、未访问真实 MySQL。
+
 ## 迁移与旧数据
 
 迁移 `1791417600000-PostCircles` 新增三个可空字段和圈层分页索引；只将旧 `visibility=school` 分类为 `campus`，保留学校、审核状态、原因、作者与投稿请求标识。

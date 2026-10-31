@@ -7,9 +7,9 @@ export type Admin = { username: string; role: string; schoolId?: string | null }
 type Circle = 'city' | 'international' | 'campus';
 type PostType = 'dynamic' | 'event' | 'market';
 type School = { id: string; name: string; shortName: string };
-type EventInfo = { location: string; startsAt: string; endsAt: string; registrationDeadline: string; capacity: number; registeredCount: number };
+type EventInfo = { location: string; startsAt: string; endsAt: string; registrationDeadline: string; capacity: number; registeredCount: number; status: 'active' | 'changed' | 'cancelled'; changeNote: string; cancellationReason: string; changedAt?: string | null };
 type Post = { id: string; title: string; content: string; type: PostType; circle: Circle | null; city: string | null; contentLanguage: string | null; schoolId: string | null; visibility: 'school' | 'platform'; status: string; createdAt: string; rejectionReason: string; imageUrl: string; tag: string; event?: EventInfo | null };
-type PostValues = { title: string; content: string; type: PostType; circle: Circle; city?: string; contentLanguage?: string; schoolId?: string; imageUrl?: string; tag?: string; location?: string; startsAt?: string; endsAt?: string; registrationDeadline?: string; capacity?: number };
+type PostValues = { title: string; content: string; type: PostType; circle: Circle; city?: string; contentLanguage?: string; schoolId?: string; imageUrl?: string; tag?: string; location?: string; startsAt?: string; endsAt?: string; registrationDeadline?: string; capacity?: number; eventStatus?: 'active' | 'changed' | 'cancelled'; changeNote?: string; cancellationReason?: string };
 type ReviewMedia = { postId: string; request: number; url: string; status: 'idle' | 'fetching' | 'loading' | 'ready' | 'error'; error: string };
 const circles = [{ value: 'city', label: '同城圈' }, { value: 'international', label: '国际圈' }, { value: 'campus', label: '校园圈' }];
 const languages = [{ value: 'zh', label: '中文' }, { value: 'en', label: '英语' }, { value: 'ru', label: '俄语' }, { value: 'fr', label: '法语' }, { value: 'es', label: '西班牙语' }, { value: 'ar', label: '阿拉伯语' }, { value: 'other', label: '其他语言' }];
@@ -127,7 +127,8 @@ export function Posts({ admin }: { admin: Admin }) {
       schoolId: post.schoolId || undefined, tag: post.tag, imageUrl: post.imageUrl,
       location: post.event?.location, startsAt: localDateTime(post.event?.startsAt), endsAt: localDateTime(post.event?.endsAt),
       registrationDeadline: localDateTime(post.event?.registrationDeadline), capacity: post.event?.capacity,
-    } : { type: 'dynamic', circle: platformAdmin ? 'city' : 'campus', schoolId: admin.schoolId || undefined, contentLanguage: 'zh', capacity: 30 });
+      eventStatus: post.event?.status || 'active', changeNote: post.event?.changeNote || '', cancellationReason: post.event?.cancellationReason || '',
+    } : { type: 'dynamic', circle: platformAdmin ? 'city' : 'campus', schoolId: admin.schoolId || undefined, contentLanguage: 'zh', capacity: 30, eventStatus: 'active' });
     setEditorOpen(true);
   };
 
@@ -138,10 +139,13 @@ export function Posts({ admin }: { admin: Admin }) {
     if (values.circle === 'city') payload.city = values.city?.trim();
     if (values.circle === 'international') payload.contentLanguage = values.contentLanguage;
     if (values.circle === 'campus') payload.schoolId = platformAdmin ? values.schoolId : admin.schoolId;
-    if (values.type === 'event' && !editing) {
+    if (values.type === 'event') {
       const start = new Date(values.startsAt || ''), end = new Date(values.endsAt || ''), deadline = new Date(values.registrationDeadline || '');
-      if ([start, end, deadline].some((date) => Number.isNaN(+date)) || start >= end || deadline >= start || deadline <= new Date()) { message.warning('请填写有效的未来活动时间：报名截止早于开始，结束晚于开始'); return; }
-      Object.assign(payload, { location: values.location?.trim(), startsAt: start.toISOString(), endsAt: end.toISOString(), registrationDeadline: deadline.toISOString(), capacity: values.capacity });
+      if ([start, end, deadline].some((date) => Number.isNaN(+date)) || start >= end || deadline >= start || (!editing && deadline <= new Date())) { message.warning('请填写有效的活动时间：报名截止早于开始，结束晚于开始'); return; }
+      const eventStatus = values.eventStatus || 'active';
+      if (eventStatus === 'changed' && !values.changeNote?.trim()) { message.warning('活动标记为已变更时，请填写变更说明'); return; }
+      if (eventStatus === 'cancelled' && !values.cancellationReason?.trim()) { message.warning('取消活动时，请填写取消原因'); return; }
+      Object.assign(payload, { location: values.location?.trim(), startsAt: start.toISOString(), endsAt: end.toISOString(), registrationDeadline: deadline.toISOString(), capacity: values.capacity, eventStatus, changeNote: values.changeNote?.trim() || '', cancellationReason: values.cancellationReason?.trim() || '' });
     }
     setSaving(true);
     try {
@@ -208,8 +212,7 @@ export function Posts({ admin }: { admin: Admin }) {
         <Form.Item name="content" label="正文" rules={[nonBlank('正文', 2, 2000)]}><Input.TextArea rows={6} maxLength={2000} showCount /></Form.Item>
         <Form.Item name="tag" label="标签（可选）"><Input maxLength={80} /></Form.Item>
         <Form.Item name="imageUrl" label="图片地址（可选）"><Input placeholder="https://..." maxLength={2048} /></Form.Item>
-        {editorType === 'event' && !editing && <><Form.Item name="location" label="活动地点" preserve={false} rules={[nonBlank('活动地点', 1, 200)]}><Input maxLength={200} /></Form.Item><Form.Item name="registrationDeadline" label="报名截止时间" preserve={false} rules={[{ required: true, message: '请选择报名截止时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="startsAt" label="开始时间" preserve={false} rules={[{ required: true, message: '请选择开始时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="endsAt" label="结束时间" preserve={false} rules={[{ required: true, message: '请选择结束时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="capacity" label="报名人数上限" preserve={false} rules={[{ required: true, type: 'number', min: 1, message: '请输入至少 1 人' }]}><InputNumber min={1} precision={0} /></Form.Item></>}
-        {editorType === 'event' && editing && <Alert className="review-note" type="info" message="本次编辑保存内容与圈层信息，活动时间和报名名额保留原值。" />}
+        {editorType === 'event' && <><Form.Item name="location" label="活动地点" preserve={false} rules={[nonBlank('活动地点', 1, 200)]}><Input maxLength={200} /></Form.Item><Form.Item name="registrationDeadline" label="报名截止时间" preserve={false} rules={[{ required: true, message: '请选择报名截止时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="startsAt" label="开始时间" preserve={false} rules={[{ required: true, message: '请选择开始时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="endsAt" label="结束时间" preserve={false} rules={[{ required: true, message: '请选择结束时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="capacity" label="报名人数上限" preserve={false} rules={[{ required: true, type: 'number', min: 1, message: '请输入至少 1 人' }]}><InputNumber min={1} precision={0} /></Form.Item>{editing && <><Form.Item name="eventStatus" label="活动状态"><Select options={[{ value: 'active', label: '正常' }, { value: 'changed', label: '已变更' }, { value: 'cancelled', label: '已取消' }]} /></Form.Item><Form.Item name="changeNote" label="变更说明"><Input.TextArea rows={3} maxLength={500} showCount placeholder="时间、地点或名额变化时填写" /></Form.Item><Form.Item name="cancellationReason" label="取消原因"><Input.TextArea rows={3} maxLength={500} showCount placeholder="取消活动时填写" /></Form.Item></>}</>}
         <Space><Button type="primary" htmlType="submit" loading={saving}>{editing ? '保存并提交审核' : '提交审核'}</Button><Button onClick={() => setEditorOpen(false)} disabled={saving}>取消</Button></Space>
       </Form>
     </Modal>

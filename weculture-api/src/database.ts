@@ -10,8 +10,9 @@ import { PostComments1792458000000 } from './migrations/1792458000000-PostCommen
 import { ContentReports1793000000000 } from './migrations/1793000000000-ContentReports';
 import { FeaturedPosts1793000001000 } from './migrations/1793000001000-FeaturedPosts';
 import { AnalyticsEvents1793000002000 } from './migrations/1793000002000-AnalyticsEvents';
+import { EventChanges1793000003000 } from './migrations/1793000003000-EventChanges';
 
-const MIGRATIONS = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000, ContentReports1793000000000, FeaturedPosts1793000001000, AnalyticsEvents1793000002000];
+const MIGRATIONS = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000, ContentReports1793000000000, FeaturedPosts1793000001000, AnalyticsEvents1793000002000, EventChanges1793000003000];
 
 export function createDatabaseOptions(): TypeOrmModuleOptions {
   if (isTest()) {

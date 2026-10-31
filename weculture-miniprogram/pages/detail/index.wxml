@@ -7,6 +7,7 @@
   <view class="content">{{post.content}}</view>
   <view wx:if="{{post.event}}" class="event card">
     <view class="event-title">活动信息</view>
+    <view wx:if="{{post.event.changeNotice}}" class="event-change"><text>{{post.event.changeNotice}}</text><text wx:if="{{post.event.changedAtText}}" class="event-change-time">更新于 {{post.event.changedAtText}}</text></view>
     <view class="event-detail"><text>地点</text><text>{{post.event.location}}</text></view>
     <view class="event-detail"><text>开始</text><text>{{post.event.startsAtText}}</text></view>
     <view wx:if="{{post.event.endsAtText}}" class="event-detail"><text>结束</text><text>{{post.event.endsAtText}}</text></view>
