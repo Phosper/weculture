@@ -9,6 +9,7 @@
     "pages/detail/index",
     "pages/author/index",
     "pages/topic/index",
+    "pages/notifications/index",
     "pages/assistant/index",
     "pages/login/index"
   ],

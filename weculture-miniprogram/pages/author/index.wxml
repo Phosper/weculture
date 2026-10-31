@@ -5,7 +5,9 @@
       <image wx:if="{{author.avatarUrl}}" class="profile-avatar" src="{{author.avatarUrl}}" mode="aspectFill" />
       <view wx:else class="profile-avatar profile-initial">{{author.initial}}</view>
       <view class="profile-copy"><view class="profile-name">{{author.nickname}}</view><text class="profile-label">作者主页</text></view>
+      <button wx:if="{{user && author.id !== user.id}}" class="follow-button {{author.following ? 'following' : ''}}" loading="{{followBusy}}" disabled="{{followBusy}}" bindtap="toggleFollow">{{author.following ? '已关注' : '关注'}}</button>
     </view>
+    <view wx:if="{{followError}}" class="follow-error">{{followError}}</view>
     <view class="works-heading"><text class="section-title">作品</text><text class="works-count">{{author.visiblePostCount}} 条可见作品</text></view>
     <view class="visibility-note">这里展示你可查看的已发布作品，包含公开内容及符合认证条件的本校内容。<button wx:if="{{user && !user.verified}}" class="verify-link" bindtap="toVerify">完成学校认证</button></view>
     <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" />

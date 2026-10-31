@@ -219,4 +219,27 @@ export class AnalyticsEvent extends BaseEntity {
   @Column({ length: 120 }) dedupeKey!: string;
 }
 
-export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport, FeaturedPost, AnalyticsEvent];
+@Entity('follows')
+@Index('IDX_follows_follower_target', ['followerId', 'targetType', 'targetId'], { unique: true })
+@Index('IDX_follows_target', ['targetType', 'targetId'])
+export class Follow extends BaseEntity {
+  @Column({ length: 36 }) followerId!: string;
+  @Column({ type: 'varchar', length: 20 }) targetType!: 'user';
+  @Column({ length: 36 }) targetId!: string;
+}
+
+@Entity('user_notifications')
+@Index('IDX_user_notifications_user_read_created', ['userId', 'readAt', 'createdAt'])
+@Index('IDX_user_notifications_dedupe', ['dedupeKey'], { unique: true })
+export class UserNotification extends BaseEntity {
+  @Column({ length: 36 }) userId!: string;
+  @Column({ type: 'varchar', length: 30 }) type!: 'comment' | 'reply' | 'follow_post' | 'event_change';
+  @Column({ type: 'varchar', length: 36, nullable: true }) actorId!: string | null;
+  @Column({ type: 'varchar', length: 20 }) objectType!: 'post' | 'comment' | 'event';
+  @Column({ length: 80 }) objectId!: string;
+  @Column({ type: 'varchar', length: 36, nullable: true }) postId!: string | null;
+  @Column({ length: 120 }) dedupeKey!: string;
+  @Column({ type: 'datetime', nullable: true }) readAt!: Date | null;
+}
+
+export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport, FeaturedPost, AnalyticsEvent, Follow, UserNotification];

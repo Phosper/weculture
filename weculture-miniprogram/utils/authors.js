@@ -25,7 +25,7 @@ function readAuthorProfile(value, id) {
   }
   // Keep only public profile fields; school membership never belongs on this page.
   return { id: value.id, nickname: value.nickname, avatarUrl: value.avatarUrl || '',
-    initial: value.nickname.slice(0, 1), visiblePostCount: value.visiblePostCount };
+    initial: value.nickname.slice(0, 1), visiblePostCount: value.visiblePostCount, following: value.following === true };
 }
 
 function readAuthorPosts(value, id, page) {

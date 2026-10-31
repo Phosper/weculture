@@ -3,14 +3,14 @@ const { api } = require('../../services/api'); const { requireLogin } = require(
 const { confirmEventCancellation, changeEventRegistration } = require('../../utils/event-registration');
 const { readPlanMeta, planSessionKey } = require('../../utils/route-planning');
 Page(withTypography({
-  data: { ...getNavMetrics(), user: null, avatarText: '我', plans: [], posts: [], favorites: [], joinedCount: 0, routeCount: 0, error: '', loading: false, tab: 'notes', eventBusyId: '', eventErrorId: '', eventError: '', stats: { posts: 0, plans: 0, likes: 0 } },
+  data: { ...getNavMetrics(), user: null, avatarText: '我', plans: [], posts: [], favorites: [], joinedCount: 0, routeCount: 0, unreadNotifications: 0, error: '', loading: false, tab: 'notes', eventBusyId: '', eventErrorId: '', eventError: '', stats: { posts: 0, plans: 0, likes: 0 } },
   async onShow() { this._visible = true; const version = this._viewVersion = (this._viewVersion || 0) + 1; selectTab(this, 4); this.syncSession(); this.setData({ eventBusyId: this._eventOperation && this._eventOperation.session === this._profileSession ? this._eventOperation.eventId : '' }); const user = await requireLogin(this); if (version !== this._viewVersion || !this._visible || !user) return; this.syncSession(); const entry = getApp().globalData.profileEntry; delete getApp().globalData.profileEntry; this.setData({ user, avatarText: user.nickname ? user.nickname.slice(0, 1) : '我', ...(entry ? { tab: 'notes' } : {}) }); return this.load(); },
   syncSession() {
     const session = planSessionKey(getApp(), wx);
     if (this._profileSession !== undefined && this._profileSession !== session) {
       this._eventOperation = null;
       this.loadVersion = (this.loadVersion || 0) + 1;
-      this.setData({ user: null, avatarText: '我', plans: [], posts: [], favorites: [], joinedCount: 0, routeCount: 0, eventError: '', eventErrorId: '', eventBusyId: '', error: '', loading: false, stats: { posts: 0, plans: 0, likes: 0 } });
+      this.setData({ user: null, avatarText: '我', plans: [], posts: [], favorites: [], joinedCount: 0, routeCount: 0, unreadNotifications: 0, eventError: '', eventErrorId: '', eventBusyId: '', error: '', loading: false, stats: { posts: 0, plans: 0, likes: 0 } });
     }
     this._profileSession = session;
   },
@@ -25,11 +25,12 @@ Page(withTypography({
     const isCurrent = () => version === this.loadVersion && this._visible !== false && session === planSessionKey(getApp(), wx);
     this.setData({ error: '', loading: true, eventError: '', eventErrorId: '' });
     try {
-      const [plans, rawPosts] = await Promise.all([api.get('/me/plans'), api.get('/me/posts')]);
+      const [plans, rawPosts, unread] = await Promise.all([api.get('/me/plans'), api.get('/me/posts'), api.get('/me/notifications/unread-count').catch(() => ({ count: 0 }))]);
       if (!isCurrent()) return;
       const formattedPlans = plans.map((plan) => ({ ...formatRoute(plan), planMeta: plan.type === 'event' ? null : readPlanMeta(plan.planMeta) }));
       const posts = rawPosts.map(formatPost);
-      this.setData({ plans: formattedPlans, posts, joinedCount: formattedPlans.filter((plan) => plan.type === 'event').length, routeCount: formattedPlans.filter((plan) => plan.type !== 'event').length, stats: { posts: posts.length, plans: plans.length, likes: posts.reduce((sum, post) => sum + (post.likeCount || 0), 0) } });
+      const unreadNotifications = unread && Number.isInteger(unread.count) && unread.count >= 0 ? unread.count : 0;
+      this.setData({ plans: formattedPlans, posts, unreadNotifications, joinedCount: formattedPlans.filter((plan) => plan.type === 'event').length, routeCount: formattedPlans.filter((plan) => plan.type !== 'event').length, stats: { posts: posts.length, plans: plans.length, likes: posts.reduce((sum, post) => sum + (post.likeCount || 0), 0) } });
       try { const favorites = await api.get('/me/favorites'); if (isCurrent()) this.setData({ favorites: favorites.map((item) => ({ key: `${item.type}-${item.data.id}`, type: item.type, data: item.type === 'post' ? formatPost(item.data) : formatRoute(item.data) })) }); } catch (_) { if (isCurrent()) this.setData({ favorites: [] }); }
     } catch (error) { if (isCurrent()) this.setData({ error: error.message }); }
     finally { if (isCurrent()) this.setData({ loading: false }); }
@@ -38,6 +39,7 @@ Page(withTypography({
   changeTab(e) { this.setData({ tab: e.currentTarget.dataset.tab }); },
   fontSettings() { wx.navigateTo({ url: '/pages/typography/index' }); },
   toAssistant() { wx.navigateTo({ url: '/pages/assistant/index' }); },
+  openNotifications() { wx.navigateTo({ url: '/pages/notifications/index' }); },
   openPost(e) { wx.navigateTo({ url: `/pages/detail/index?id=${e.currentTarget.dataset.id}` }); },
   openSaved(e) { if (e.currentTarget.dataset.type === 'route') wx.switchTab({ url: '/pages/travel/index' }); else this.openPost(e); },
   openPlan(e) {

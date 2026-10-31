@@ -128,6 +128,15 @@
 - 内容关联（笔记到活动／路线）仍仅设计，未新增 `post_relations` 表或接口。
 - 本地检查：`test/event-changes.e2e-spec.ts`（变更、取消、空说明拒绝、字段保留）、`test/event-changes-migration.e2e-spec.ts`（加列/回退/MySQL SQL）；小程序 `test/event-change.test.js`（展示和回退文案）。未部署、未访问真实 MySQL。
 
+## 站内关注与通知：2026-11-01 本地实现，待配套发布
+
+- `POST /api/v1/users/:id/follow`、`DELETE /api/v1/users/:id/follow`：关注／取消关注作者，幂等，不能关注自己；`GET /api/v1/users/:id` 增加 `following` 布尔值。
+- `GET /api/v1/me/notifications?page=1&pageSize=20`：返回 `{items,page,pageSize,total,hasMore,unreadCount}`；`GET /api/v1/me/notifications/unread-count`；`POST /api/v1/me/notifications/:id/read`；`POST /api/v1/me/notifications/read-all`。只能操作自己的通知。
+- 通知类型：顶层评论→内容作者；回复→父评论作者；关注作者内容审核通过→关注者；活动变更／取消→已报名用户。`dedupeKey` 唯一防重复；不存评论正文或身份明文；对象下架／评论删除后 `available=false`，不泄露正文。
+- 新表 `follows`、`user_notifications`，迁移 `1793000004000-FollowsNotifications`；`follows` 唯一（follower,targetType,targetId），通知按用户／未读／时间索引。
+- 小程序：作者页关注按钮、个人页通知入口和未读数、通知页加载／已读／全部已读／回到内容。微信订阅消息、系统推送、通知清理和后台通知管理未实现。
+- 本地检查：`test/follows-notifications.e2e-spec.ts`（关注、评论／回复、关注作者发布去重、活动变更、不可用对象、鉴权分页）、`test/follows-notifications-migration.e2e-spec.ts`（双表、唯一索引、回退、MySQL SQL）；小程序 `test/author-follow.test.js`、`test/notifications.test.js`。未部署、未访问真实 MySQL。
+
 ## 迁移与旧数据
 
 迁移 `1791417600000-PostCircles` 新增三个可空字段和圈层分页索引；只将旧 `visibility=school` 分类为 `campus`，保留学校、审核状态、原因、作者与投稿请求标识。

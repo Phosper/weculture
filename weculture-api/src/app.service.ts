@@ -2,8 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
-import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
-import { AdminAccount, AnalyticsEvent, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, FeaturedPost, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
+import { DataSource, EntityManager, In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
+import { AdminAccount, AnalyticsEvent, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, FeaturedPost, Follow, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserNotification, UserPlan } from './entities';
 import { adminAuthVersion, createToken, Session } from './auth';
 import { AdminLoginLimiter, DEMO_ADMIN_PASSWORD, validNewAdminPassword } from './admin-security';
 import { previewStoredImage } from './admin-media';
@@ -37,6 +37,8 @@ export class AppService implements OnModuleInit {
     @InjectRepository(ContentReport) private reports: Repository<ContentReport>,
     @InjectRepository(FeaturedPost) private featured: Repository<FeaturedPost>,
     @InjectRepository(AnalyticsEvent) private analytics: Repository<AnalyticsEvent>,
+    @InjectRepository(Follow) private follows: Repository<Follow>,
+    @InjectRepository(UserNotification) private notifications: Repository<UserNotification>,
     @InjectRepository(Event) private events: Repository<Event>,
     @InjectRepository(EventRegistration) private registrations: Repository<EventRegistration>,
     @InjectRepository(Like) private likes: Repository<Like>,
@@ -157,6 +159,35 @@ export class AppService implements OnModuleInit {
     const parsed = new Date(`${value}T00:00:00+08:00`);
     if (Number.isNaN(+parsed) || this.beijingDateKey(parsed) !== value) throw new BadRequestException('日期无效');
     return value;
+  }
+  private async notify(input: { userId: string; type: UserNotification['type']; actorId?: string | null; objectType: UserNotification['objectType']; objectId: string; postId?: string | null; dedupeKey: string }) {
+    if (!input.userId || input.userId === input.actorId) return;
+    try {
+      await this.notifications.save(this.notifications.create({
+        userId: input.userId, type: input.type, actorId: input.actorId || null, objectType: input.objectType,
+        objectId: input.objectId, postId: input.postId || null, dedupeKey: input.dedupeKey, readAt: null,
+      }));
+    } catch (_) {
+      // Notifications must never block the underlying action.
+    }
+  }
+  private async notifyFollowers(post: Post) {
+    try {
+      const followers = await this.follows.find({ where: { targetType: 'user', targetId: post.authorId }, take: 500 });
+      for (const follower of followers) {
+        await this.notify({ userId: follower.followerId, type: 'follow_post', actorId: post.authorId, objectType: 'post', objectId: post.id, postId: post.id, dedupeKey: `follow_post:${post.id}:${follower.followerId}` });
+      }
+    } catch (_) {}
+  }
+  private async notifyEventRegistrants(post: Post, event: Event) {
+    if (!event.changedAt) return;
+    try {
+      const stamp = new Date(event.changedAt).toISOString();
+      const registrations = await this.registrations.find({ where: { eventId: event.id, status: 'registered' }, take: 500 });
+      for (const registration of registrations) {
+        await this.notify({ userId: registration.userId, type: 'event_change', actorId: null, objectType: 'event', objectId: event.id, postId: post.id, dedupeKey: `event_change:${event.id}:${stamp}:${registration.userId}` });
+      }
+    } catch (_) {}
   }
   private ensureAdminScope(admin: AdminSession, schoolId: string | null) { if (admin.role !== 'super_admin' && (!schoolId || admin.schoolId !== schoolId)) throw new ForbiddenException('无权操作该学校资源'); }
   private requireAdminRole(admin: AdminSession, ...roles: Array<NonNullable<AdminSession['role']>>) { if (!admin.role || !roles.includes(admin.role)) throw new ForbiddenException('当前管理员角色无权执行此操作'); }
@@ -389,7 +420,79 @@ export class AppService implements OnModuleInit {
     const user = await this.publicUser(id);
     const member = await this.memberships.findOneBy({ userId: session.id, verificationStatus: 'verified' });
     const visiblePostCount = await this.visiblePostsQuery(member?.schoolId).andWhere('post.authorId = :authorId', { authorId: user.id }).getCount();
-    return this.publicUserSummary(user, visiblePostCount);
+    const following = await this.follows.existsBy({ followerId: session.id, targetType: 'user', targetId: user.id });
+    return { ...this.publicUserSummary(user, visiblePostCount), following };
+  }
+  async followUser(session: UserSession, id: string) {
+    await this.currentUser(session);
+    const target = await this.publicUser(id);
+    if (target.id === session.id) throw new BadRequestException('不能关注自己');
+    if (!await this.follows.existsBy({ followerId: session.id, targetType: 'user', targetId: target.id })) {
+      await this.follows.save(this.follows.create({ followerId: session.id, targetType: 'user', targetId: target.id }));
+    }
+    return { following: true };
+  }
+  async unfollowUser(session: UserSession, id: string) {
+    await this.currentUser(session);
+    await this.publicUser(id);
+    await this.follows.delete({ followerId: session.id, targetType: 'user', targetId: id });
+    return { following: false };
+  }
+  async listNotifications(session: UserSession, query: Record<string, unknown> = {}) {
+    await this.currentUser(session);
+    if (Object.keys(query).some((key) => !['page', 'pageSize'].includes(key))) throw new BadRequestException('分页参数无效');
+    const { page, pageSize } = this.notificationPagination(query);
+    const [rows, total] = await this.notifications.findAndCount({ where: { userId: session.id }, order: { createdAt: 'DESC', id: 'DESC' }, skip: (page - 1) * pageSize, take: pageSize });
+    const unreadCount = await this.notifications.countBy({ userId: session.id, readAt: IsNull() });
+    return { items: await this.decorateNotifications(rows), page, pageSize, total, hasMore: page * pageSize < total, unreadCount };
+  }
+  async unreadNotificationCount(session: UserSession) {
+    await this.currentUser(session);
+    return { count: await this.notifications.countBy({ userId: session.id, readAt: IsNull() }) };
+  }
+  async markNotificationRead(session: UserSession, id: string) {
+    await this.currentUser(session);
+    if (typeof id !== 'string' || !id || id.length > 80) throw new BadRequestException('通知参数无效');
+    const notification = await this.notifications.findOneBy({ id, userId: session.id });
+    if (!notification) throw new NotFoundException('通知不存在');
+    if (!notification.readAt) await this.notifications.update({ id: notification.id, userId: session.id }, { readAt: new Date() });
+    return { read: true, id: notification.id };
+  }
+  async markAllNotificationsRead(session: UserSession) {
+    await this.currentUser(session);
+    const result = await this.notifications.update({ userId: session.id, readAt: IsNull() }, { readAt: new Date() });
+    return { count: result.affected || 0 };
+  }
+  private notificationPagination(query: Record<string, unknown>) {
+    const parse = (value: unknown, fallback: number, maximum: number) => {
+      if (value === undefined) return fallback;
+      if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value) || Number(value) > maximum) throw new BadRequestException('分页参数无效');
+      return Number(value);
+    };
+    return { page: parse(query.page, 1, 10000), pageSize: parse(query.pageSize, 20, 50) };
+  }
+  private async decorateNotifications(rows: UserNotification[]) {
+    if (!rows.length) return [];
+    const postIds = [...new Set(rows.map((row) => row.postId).filter((id): id is string => Boolean(id)))];
+    const commentIds = [...new Set(rows.filter((row) => row.objectType === 'comment').map((row) => row.objectId))];
+    const actorIds = [...new Set(rows.map((row) => row.actorId).filter((id): id is string => Boolean(id)))];
+    const [posts, comments, users] = await Promise.all([
+      postIds.length ? this.posts.findBy({ id: In(postIds) }) : Promise.resolve([] as Post[]),
+      commentIds.length ? this.comments.findBy({ id: In(commentIds) }) : Promise.resolve([] as PostComment[]),
+      actorIds.length ? this.users.findBy({ id: In(actorIds) }) : Promise.resolve([] as User[]),
+    ]);
+    const postMap = new Map(posts.map((post) => [post.id, post]));
+    const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    return rows.map((row) => {
+      const post = row.postId ? postMap.get(row.postId) : undefined;
+      const comment = row.objectType === 'comment' ? commentMap.get(row.objectId) : undefined;
+      const actor = row.actorId ? userMap.get(row.actorId) : undefined;
+      const visible = Boolean(post && post.status === 'approved' && (row.objectType !== 'comment' || (comment && !comment.deleted)));
+      return { id: row.id, type: row.type, objectType: row.objectType, objectId: row.objectId, postId: row.postId,
+        actor: actor ? { id: actor.id, nickname: actor.nickname || 'Weculture 用户', avatarUrl: actor.avatarUrl, profileAvailable: actor.status === 'active' } : null,
+        postTitle: post?.title || '', available: visible, readAt: row.readAt, createdAt: row.createdAt };
+    });
   }
 
   async getUserPosts(session: UserSession, id: string, query: Record<string, unknown>) {
@@ -520,6 +623,12 @@ export class AppService implements OnModuleInit {
     if (outcome.created) {
       const post = await this.posts.findOneBy({ id: postId });
       await this.recordEvent({ eventCode: 'comment_created', userId: session.id, schoolId: post?.schoolId || null, targetType: 'post', targetId: postId, properties: { postType: post?.type || '', isReply: Boolean(parentId) } });
+      if (post && !parentId) {
+        await this.notify({ userId: post.authorId, type: 'comment', actorId: session.id, objectType: 'post', objectId: post.id, postId: post.id, dedupeKey: `comment:${outcome.result.id}:${post.authorId}` });
+      } else if (parentId) {
+        const parent = await this.comments.findOneBy({ id: parentId, postId });
+        if (parent) await this.notify({ userId: parent.authorId, type: 'reply', actorId: session.id, objectType: 'comment', objectId: parentId, postId, dedupeKey: `reply:${outcome.result.id}:${parent.authorId}` });
+      }
     }
     return outcome.result;
   }
@@ -634,6 +743,7 @@ export class AppService implements OnModuleInit {
         return created;
       });
       await this.recordEvent({ eventCode: 'post_published', userId: session.id, schoolId: post.schoolId, targetType: 'post', targetId: post.id, properties: { postType: post.type, circle: post.circle, status: post.status } });
+      if (post.status === 'approved') await this.notifyFollowers(post);
       return resultFor(post);
     } catch (error) {
       // The unique index resolves concurrent retries, including across API instances.
@@ -940,6 +1050,10 @@ export class AppService implements OnModuleInit {
       return post;
     };
     const saved = core.type === 'event' ? await this.eventTransaction(save) : await this.dataSource.transaction(save);
+    if (core.type === 'event') {
+      const current = await this.events.findOneBy({ postId: saved.id });
+      if (current?.changedAt) await this.notifyEventRegistrants(saved, current);
+    }
     return this.decorateAdminPost(saved);
   }
   async reviewPost(session: AdminSession, postId: string, status: 'approved' | 'rejected' | 'offline', reason = '') {
@@ -964,6 +1078,7 @@ export class AppService implements OnModuleInit {
     const created = new Date(post.createdAt).getTime();
     const latencySeconds = Number.isFinite(created) ? Math.max(0, Math.round((Date.now() - created) / 1000)) : 0;
     await this.recordEvent({ eventCode: 'post_reviewed', userId: admin.id, schoolId: post.schoolId, targetType: 'post', targetId: post.id, properties: { status, latencyBucket: this.latencyBucket(latencySeconds) } });
+    if (status === 'approved') await this.notifyFollowers(post);
     return this.decorateAdminPost(post);
   }
   async adminAnalytics(session: AdminSession, query: Record<string, unknown> = {}) {

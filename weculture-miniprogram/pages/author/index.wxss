@@ -5,6 +5,10 @@
 .profile-copy { flex: 1; min-width: 0; }
 .profile-name { color: #1C1B1F; font-size: calc(36rpx * var(--font-scale, 1)); font-weight: 700; line-height: 1.45; word-break: break-all; }
 .profile-label { display: block; margin-top: 8rpx; color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); }
+.follow-button { flex-shrink: 0; margin: 0; padding: 0 22rpx; border: 1rpx solid #C5532E; border-radius: 999rpx; background: #FFFFFF; color: #C5532E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 2.4; }
+.follow-button.following { border-color: #D8D3CC; background: #F2F1EE; color: #79747E; }
+.follow-button::after { border: none; }
+.follow-error { margin-top: 12rpx; color: #9A362B; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.6; word-break: break-all; }
 .works-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12rpx; margin: 32rpx 0 12rpx; }
 .works-count { color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.6; }
 .visibility-note { margin-bottom: 26rpx; color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.7; }

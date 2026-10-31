@@ -1,0 +1,20 @@
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="page notifications-page">
+  <view class="notifications-heading"><text class="section-title">通知</text><button class="button-plain" disabled="{{!unreadCount || readAllBusy}}" bindtap="readAll">{{readAllBusy ? '处理中…' : '全部已读'}}</button></view>
+  <view wx:if="{{unreadCount}}" class="notifications-summary">{{unreadCount}} 条未读</view>
+  <view wx:if="{{error}}" class="error">{{error}}<button class="button-plain" bindtap="retry">重新加载</button></view>
+  <view wx:if="{{loading && !notifications.length}}" class="empty">正在加载通知…</view>
+  <view wx:if="{{!loading && !error && !notifications.length}}" class="notifications-empty"><text class="empty-title">还没有通知</text><text class="empty-description">关注作者或参与评论后，这里会显示互动消息。</text></view>
+  <view wx:for="{{notifications}}" wx:key="id" class="notification-item {{item.read ? 'read' : 'unread'}}" data-id="{{item.id}}" bindtap="openNotification">
+    <view class="notification-dot" wx:if="{{!item.read}}"></view>
+    <view class="notification-avatar">{{item.actorInitial}}</view>
+    <view class="notification-copy">
+      <view class="notification-title">{{item.actorNickname}} {{item.typeLabel}}</view>
+      <view class="notification-object">{{item.available ? item.postTitle : '相关内容已不可用'}}</view>
+      <view class="notification-time">{{item.timeText}}</view>
+    </view>
+  </view>
+  <view wx:if="{{loading && notifications.length}}" class="empty">正在加载更多…</view>
+  <button wx:if="{{!loading && !error && hasMore}}" class="button-plain load-more" bindtap="loadMore">加载更多</button>
+  <view wx:if="{{!loading && notifications.length && !hasMore}}" class="feed-end">已显示全部通知</view>
+</view>

@@ -11,7 +11,7 @@ const sessionKey = () => {
 };
 
 Page(withTypography({
-  data: { author: null, user: null, ...emptyFeed(), loading: false, error: '', unavailable: false },
+  data: { author: null, user: null, ...emptyFeed(), loading: false, error: '', unavailable: false, followBusy: false, followError: '' },
   onLoad(options = {}) {
     this.authorId = authorPath(options.id) ? options.id : '';
     this.hideShareMenu();
@@ -45,7 +45,8 @@ Page(withTypography({
     this._version = (this._version || 0) + 1;
     this._profileRead = null;
     this._postsRead = null;
-    this.setData({ author: null, user: null, ...emptyFeed(), loading: false, error: '', unavailable: false });
+    this._followOperation = null;
+    this.setData({ author: null, user: null, ...emptyFeed(), loading: false, error: '', unavailable: false, followBusy: false, followError: '' });
   },
   sessionCurrent() {
     if (!this._visible || !this.data.user) return false;
@@ -112,6 +113,24 @@ Page(withTypography({
     const unavailable = [403, 404].includes(error.statusCode);
     this.setData({ error: unavailable ? '作者主页暂不可访问，请返回发现查看其他内容' : error.message || '加载失败，请检查网络后重试',
       unavailable, ...(unavailable ? { author: null, ...emptyFeed() } : {}) });
+  },
+  async toggleFollow() {
+    const author = this.data.author, user = this.data.user;
+    if (!author || !user || author.id === user.id || this._followOperation || !this.sessionCurrent()) return;
+    const operation = { session: this._session, id: author.id, following: !author.following };
+    this._followOperation = operation;
+    this.setData({ followBusy: true, followError: '' });
+    try {
+      const result = operation.following ? await api.post(`/users/${author.id}/follow`, {}) : await api.delete(`/users/${author.id}/follow`);
+      if (this._followOperation !== operation || !this.sessionCurrent()) return;
+      if (!result || result.following !== operation.following) throw new Error('关注状态暂未确认，请重试');
+      this.setData({ author: { ...this.data.author, following: result.following }, followError: '' });
+      wx.showToast({ title: result.following ? '已关注' : '已取消关注', icon: 'none' });
+    } catch (error) {
+      if (this._followOperation === operation && this.sessionCurrent()) this.setData({ followError: error.message || '操作失败，请检查网络后重试' });
+    } finally {
+      if (this._followOperation === operation) { this._followOperation = null; this.setData({ followBusy: false }); }
+    }
   },
   loadMore() { return this.loadPosts(false); },
   retry() {

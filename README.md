@@ -1,5 +1,7 @@
 # Weculture 单校内测工程
 
+**2026-11-01 P4站内关注／通知本地实现：**新增`follows`、`user_notifications`迁移，作者关注、个人页通知入口、站内通知列表、未读／已读和全部已读；评论、回复、关注作者发布、活动变更会生成站内通知，去重且不泄露正文。微信订阅消息未实现。API 237项、小程序227项、后台构建和全部页面编译通过。`ContentReports`、`FeaturedPosts`、`AnalyticsEvents`、`EventChanges`、`FollowsNotifications` 五个迁移均未执行到云端，未部署、未上传、未真机验收。详见[P3b–P4详细设计](WecultureP3b-P4设计与依赖20261101.md)。
+
 **2026-11-01 P3c活动变更本地实现：**活动新增`changeNote`、`changedAt`、`cancellationReason`字段；后台可编辑活动时间／地点／名额并标记变更或取消，详情页展示变更说明和更新时间。内容关联仍仅设计。API 228项、小程序219项、后台构建和详情页编译通过。`ContentReports`、`FeaturedPosts`、`AnalyticsEvents`、`EventChanges` 四个迁移均未执行到云端，未部署、未上传、未真机验收。详见[P3c活动变更](WecultureP3b-P4设计与依赖20261101.md)。
 
 **2026-11-01 P2b最小事件统计本地实现：**新增`analytics_events`迁移和服务端事件写入（搜索、浏览、投稿、评论、报名／取消、审核），后台新增“数据统计”按日聚合；不采集搜索词、评论正文或OpenID。API 221项、小程序216项、后台构建通过。`ContentReports`、`FeaturedPosts`、`AnalyticsEvents` 三个迁移均未执行到云端，未部署、未上传、未真机验收。详见[最小事件统计设计](Weculture最小事件统计设计20261101.md)。

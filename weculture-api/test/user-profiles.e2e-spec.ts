@@ -59,7 +59,8 @@ describe('Public user search and author profiles', () => {
     const user = viewer === 'guest' ? guest : viewer === 'schoolA' ? readerA : viewer === 'schoolB' ? readerB : author;
     const expected = [...publicIds, ...(viewer === 'guest' ? [] : [campusIds[viewer === 'schoolB' ? 1 : 0]])].sort().reverse();
     const profile = (await get(user, `users/${author.id}`).expect(200)).body.data;
-    expect(profile).toEqual({ id: author.id, nickname: author.nickname, avatarUrl: author.avatarUrl, visiblePostCount: expected.length });
+    expect(profile).toEqual({ id: author.id, nickname: author.nickname, avatarUrl: author.avatarUrl, visiblePostCount: expected.length, following: false });
+    const searchProfile = { id: profile.id, nickname: profile.nickname, avatarUrl: profile.avatarUrl, visiblePostCount: profile.visiblePostCount };
     const page = (await get(user, `users/${author.id}/posts`).expect(200)).body.data;
     expect(page).toMatchObject({ page: 1, pageSize: 20, total: expected.length, hasMore: false });
     expect(page.items.map((item: Post) => item.id)).toEqual(expected);
@@ -67,7 +68,7 @@ describe('Public user search and author profiles', () => {
     const feed = (await get(user, 'posts', { page: '1', pageSize: '100' }).expect(200)).body.data;
     expect(feed.items.filter((item: Post) => item.authorId === author.id).map((item: Post) => item.id)).toEqual(expected);
     const users = (await search(user, '  authorALPHA  ').expect(200)).body.data;
-    expect(users).toEqual({ items: [profile], page: 1, pageSize: 20, total: 1, hasMore: false });
+    expect(users).toEqual({ items: [searchProfile], page: 1, pageSize: 20, total: 1, hasMore: false });
   });
 
   it('returns an active zero-visible-post profile without making it searchable', async () => {
@@ -101,12 +102,13 @@ describe('Public user search and author profiles', () => {
   it('uses only public metadata and the displayed fallback nickname', async () => {
     const fallback = await account('profile-fallback', ''); await post(fallback.id);
     const profile = (await get(guest, `users/${fallback.id}`).expect(200)).body.data;
-    expect(profile).toEqual({ id: fallback.id, nickname: 'Weculture 用户', avatarUrl: fallback.avatarUrl, visiblePostCount: 1 });
+    expect(profile).toEqual({ id: fallback.id, nickname: 'Weculture 用户', avatarUrl: fallback.avatarUrl, visiblePostCount: 1, following: false });
     const result = (await search(guest, 'weculture 用户').expect(200)).body.data;
-    expect(result.items).toContainEqual(profile);
-    for (const value of [...result.items, (await get(readerA, `users/${author.id}`).expect(200)).body.data]) {
+    expect(result.items).toContainEqual({ id: profile.id, nickname: profile.nickname, avatarUrl: profile.avatarUrl, visiblePostCount: profile.visiblePostCount });
+    for (const value of result.items) {
       expect(Object.keys(value).sort()).toEqual(['avatarUrl', 'id', 'nickname', 'visiblePostCount']);
     }
+    expect(Object.keys((await get(readerA, `users/${author.id}`).expect(200)).body.data).sort()).toEqual(['avatarUrl', 'following', 'id', 'nickname', 'visiblePostCount']);
     expect(JSON.stringify(result)).not.toMatch(/wechatOpenId|private-openid|schoolId|membership|status|createdAt/);
   });
 

@@ -32,6 +32,19 @@ export class AppController {
   @Get('users/:id') userProfile(@Req() req: { user: any }, @Param('id') id: string, @Query() query: Record<string, unknown>) { return this.service.getUserProfile(req.user, id, query); }
   @UseGuards(UserGuard)
   @Get('users/:id/posts') userPosts(@Req() req: { user: any }, @Param('id') id: string, @Query() query: Record<string, unknown>) { return this.service.getUserPosts(req.user, id, query); }
+  @UseGuards(UserGuard)
+  @Post('users/:id/follow') followUser(@Req() req: { user: any }, @Param('id') id: string) { return this.service.followUser(req.user, id); }
+  @UseGuards(UserGuard)
+  @Delete('users/:id/follow') unfollowUser(@Req() req: { user: any }, @Param('id') id: string) { return this.service.unfollowUser(req.user, id); }
+
+  @UseGuards(UserGuard)
+  @Get('me/notifications') notifications(@Req() req: { user: any }, @Query() query: Record<string, unknown>) { return this.service.listNotifications(req.user, query); }
+  @UseGuards(UserGuard)
+  @Get('me/notifications/unread-count') unreadNotifications(@Req() req: { user: any }) { return this.service.unreadNotificationCount(req.user); }
+  @UseGuards(UserGuard)
+  @Post('me/notifications/read-all') readAllNotifications(@Req() req: { user: any }) { return this.service.markAllNotificationsRead(req.user); }
+  @UseGuards(UserGuard)
+  @Post('me/notifications/:id/read') readNotification(@Req() req: { user: any }, @Param('id') id: string) { return this.service.markNotificationRead(req.user, id); }
 
   @UseGuards(UserGuard)
   @Get('featured') featured(@Req() req: { user: any }) { return this.service.featuredPosts(req.user); }

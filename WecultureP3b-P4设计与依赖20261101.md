@@ -69,41 +69,25 @@
 
 活动状态模型、通知需求确认、后台编辑体验、跨校权限。**未实现。**
 
-## 3. P4 关注与通知
+## 3. P4 关注与通知（站内已实现；微信订阅消息未实现）
 
-### 目标
+**本地状态：**作者关注、站内通知、未读／已读、评论／回复／关注作者发布／活动变更通知已实现；微信订阅消息、推送和通知清理未实现。
 
-用户可关注作者/话题，收到站内互动回流；微信订阅消息在用户主动订阅且平台允许时另行接入，不能作为唯一通道。
+### 已实现的数据与行为
 
-### 数据模型（建议）
+- `follows`：`followerId`、`targetType='user'`、`targetId`；唯一 `(followerId,targetType,targetId)`；关注幂等，不能关注自己；取消后不再新增通知。
+- `user_notifications`：`userId`、`type`（comment/reply/follow_post/event_change）、`actorId` nullable、`objectType`、`objectId`、`postId` nullable、`dedupeKey` 唯一、`readAt` nullable、`createdAt`；不存评论正文或身份明文。
+- API：`POST/DELETE /users/:id/follow`；`GET /me/notifications`、`GET /me/notifications/unread-count`、`POST /me/notifications/:id/read`、`POST /me/notifications/read-all`；作者资料返回 `following`。
+- 通知触发：顶层评论→内容作者；回复→父评论作者；关注作者的内容审核通过→关注者（重复审核按 `dedupeKey` 去重）；活动变更／取消→已报名用户（按 `changedAt` 去重）。粉丝／报名者单次最多处理 500 人，未做批量队列。
+- 小程序：作者页关注按钮；个人页通知入口和未读数；通知页加载、未读／已读、全部已读、点击回到内容；对象下架或评论删除后显示“相关内容已不可用”，不泄露正文。
+- 本地检查：API 28个测试文件、237项通过（关注通知5项＋迁移4项）；小程序21个文件、227项通过（作者关注3项＋通知页5项）；后台构建和全部WXML／WXSS编译通过。
+- 限制：只支持关注作者，不支持关注话题；未接微信订阅消息、系统推送、通知保留清理、后台通知管理或导出；未真实 MySQL、未部署、未真机。
 
-`follows`：
-- `followerId`、`targetType`（user/topic）、`targetId`、`createdAt`；唯一 `(followerId,targetType,targetId)`；索引 `(targetType,targetId)`。
-- 关注幂等；取消后不再新增通知；不关注自己。
+### 未实现／依赖
 
-`notifications`：
-- `id`、`userId`（接收者）、`type`（comment/reply/follow_post/event_change）、`actorId` nullable、`objectType`、`objectId`、`dedupeKey`、`readAt` nullable、`createdAt`。
-- 唯一 `dedupeKey` 防重复；索引 `(userId,readAt,createdAt)`。
-- 不存评论正文或敏感内容；打开时按当前权限读取对象，不可见则显示“内容已不可用”。
-
-### 行为
-
-- 评论我的内容、回复我的评论、关注作者发布新内容、P3c 活动变更可产生通知。
-- 同一事件短时间重复（重试、编辑）按 `dedupeKey` 合并；已删除/下架/撤认证对象不泄露。
-- 未读数、全部已读、单条已读；换账号立即清空本地未读缓存。
-- 微信订阅消息：用户主动点击订阅后才申请模板；模板 ID、频率、一次授权一次发送按平台规则；发送失败不影响站内通知；提供关闭入口。
-- 不做营销推送、不做关注推荐、不做无限历史。
-
-### 完成标准
-
-- 关注/取消幂等；通知去重、未读、已读、越权、删除、下架、换账号有回归。
-- 站内通知能回到有权查看的对象；订阅消息失败/拒绝不影响站内。
-- 数据最小化；保留周期和关闭入口明确。
-- 真实微信订阅消息需平台模板和真机验证；未取得前不写成已实现。
-
-### 依赖
-
-P3c 活动变更、微信订阅消息模板与平台审核、通知保留策略、隐私说明。**未实现。**
+- 微信订阅消息需要模板 ID、平台审核、用户主动订阅和真机验证；没有这些条件不能写成已实现。
+- 通知保留周期、批量补发、失败重试队列和后台治理另包设计。
+- 内容关联（P3c `post_relations`）仍未实现；关注话题依赖关联/话题模型。
 
 ## 4. 跨包发布与风险
 
