@@ -23,4 +23,5 @@ export const client = {
   get: async <T = any>(url: string): Promise<T> => (await instance.get(url)).data.data,
   post: async <T = any>(url: string, data?: any): Promise<T> => (await instance.post(url, data)).data.data,
   patch: async <T = any>(url: string, data?: any): Promise<T> => (await instance.patch(url, data)).data.data,
+  delete: async <T = any>(url: string): Promise<T> => (await instance.delete(url)).data.data,
 };

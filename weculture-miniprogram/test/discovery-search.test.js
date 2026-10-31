@@ -21,7 +21,8 @@ function harness(get, user = { id: 'reader', verified: true }) {
       if (id.endsWith('/guard')) return { requireLogin: () => app.login ? app.login() : Promise.resolve(app.globalData.user) };
       if (id.endsWith('/nav')) return { getNavMetrics: () => ({}), selectTab() {} };
       if (id.endsWith('/format')) return { formatPost };
-      if (id.endsWith('/api')) return { api: { get: url => { calls.push(url); return get(url); } } };
+      if (id.endsWith('/return-path')) return require('../utils/return-path');
+      if (id.endsWith('/api')) return { api: { get: url => { if (url === '/featured') return Promise.resolve({ items: [] }); calls.push(url); return get(url); } } };
       throw new Error(`Unexpected module ${id}`);
     }
   });

@@ -7,6 +7,7 @@ import { PostCircles1791417600000 } from '../src/migrations/1791417600000-PostCi
 import { RoutePlanDetails1792454400000 } from '../src/migrations/1792454400000-RoutePlanDetails';
 import { PostComments1792458000000 } from '../src/migrations/1792458000000-PostComments';
 import { ContentReports1793000000000 } from '../src/migrations/1793000000000-ContentReports';
+import { FeaturedPosts1793000001000 } from '../src/migrations/1793000001000-FeaturedPosts';
 
 const migrations = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000];
 const fixture = { postId: 'post-a', authorId: 'user-a', content: '迁移前已有评论', parentId: null, clientRequestId: 'request-a', clientRequestHash: 'a'.repeat(64), submissionHash: 'b'.repeat(64) };
@@ -79,7 +80,7 @@ describe('Post comments migration', () => {
     try {
       for (const type of ['mysql', 'sqljs']) {
         process.env.NODE_ENV = 'development'; process.env.DB_TYPE = type;
-        expect(createDataSourceOptions().migrations).toEqual([...migrations, ContentReports1793000000000]);
+        expect(createDataSourceOptions().migrations).toEqual([...migrations, ContentReports1793000000000, FeaturedPosts1793000001000]);
       }
     } finally {
       for (const [key, value] of Object.entries(previous)) if (value === undefined) delete process.env[key]; else process.env[key] = value;

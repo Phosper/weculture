@@ -33,7 +33,8 @@ function harness(name, get = async () => result()) {
       if (id.endsWith('/guard')) return { requireLogin: () => app.login ? app.login() : Promise.resolve(app.globalData.user) };
       if (id.endsWith('/nav')) return { getNavMetrics: () => ({}), selectTab() {} };
       if (id.endsWith('/format')) return { formatPost };
-      if (id.endsWith('/api')) return { api: { get: url => { calls.push(url); return get(url); } } };
+      if (id.endsWith('/return-path')) return require('../utils/return-path');
+      if (id.endsWith('/api')) return { api: { get: url => { if (url === '/featured') return Promise.resolve({ items: [] }); calls.push(url); return get(url); } } };
       if (id.endsWith('/circles')) return circles.exports;
       if (id.endsWith('/features')) return { FEATURES: { automaticCityLocation: false } };
       if (id.endsWith('/location')) return { getCurrentCity() { throw new Error('Automatic location must stay disabled'); }, LOCATION_SCOPE: 'scope.userFuzzyLocation' };

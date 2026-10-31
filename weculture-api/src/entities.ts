@@ -190,4 +190,16 @@ export class ContentReport extends BaseEntity {
   @Column('text') resolution!: string;
 }
 
-export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport];
+@Entity('featured_posts')
+@Index('IDX_featured_posts_post', ['postId'], { unique: true })
+@Index('IDX_featured_posts_scope_status_order', ['scope', 'schoolId', 'status', 'sortOrder'])
+export class FeaturedPost extends BaseEntity {
+  @Column({ length: 36 }) postId!: string;
+  @Column({ type: 'varchar', length: 20 }) scope!: 'platform' | 'school';
+  @Column({ type: 'varchar', length: 36, nullable: true }) schoolId!: string | null;
+  @Column({ default: 0 }) sortOrder!: number;
+  @Column({ default: 'active' }) status!: 'active' | 'inactive';
+  @Column({ length: 36 }) createdBy!: string;
+}
+
+export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport, FeaturedPost];

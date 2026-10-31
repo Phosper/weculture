@@ -3,6 +3,7 @@ const { api } = require('../../services/api');
 const { requireLogin } = require('../../utils/guard');
 const { formatPost } = require('../../utils/format');
 const { getNavMetrics, selectTab } = require('../../utils/nav');
+const { detailPath } = require('../../utils/return-path');
 
 const FEEDS = ['latest', 'public', 'campus'];
 const TYPES = ['all', 'dynamic', 'event', 'market'];
@@ -19,7 +20,7 @@ const EVENT_TIMES = [
 
 Page(withTypography({
   data: {
-    ...getNavMetrics(), user: null, posts: [], leftPosts: [], rightPosts: [],
+    ...getNavMetrics(), user: null, posts: [], leftPosts: [], rightPosts: [], featured: [], featuredLoading: false,
     q: '', activeSearch: '', searchFocused: false, searchMode: 'content', feed: 'latest', type: 'all', eventTime: 'all', eventTimes: EVENT_TIMES,
     page: 0, total: 0, hasMore: false, error: '', loading: false,
     users: [], userPage: 0, userTotal: 0, userHasMore: false, userError: '', userLoading: false,
@@ -32,6 +33,7 @@ Page(withTypography({
     this._requestVersion = (this._requestVersion || 0) + 1;
     this._userRequestVersion = (this._userRequestVersion || 0) + 1;
     this.clearResults();
+    this.clearFeatured();
     selectTab(this, 0);
     const user = await requireLogin(this);
     if (version !== this._showVersion) return;
@@ -46,19 +48,54 @@ Page(withTypography({
     this._userSessionStale = false;
     this._userSession = null;
     this.setData({ user, ...(changedAccount ? { searchMode: 'content', feed: 'latest', type: 'all', eventTime: 'all', q: '', activeSearch: '', searchFocused: false } : {}) });
-    return this.loadResults();
+    const loading = this.loadResults();
+    this.loadFeatured(user);
+    return loading;
   },
   onHide() {
     this._loginPending = false;
     this._showVersion = (this._showVersion || 0) + 1;
     this._requestVersion = (this._requestVersion || 0) + 1;
     this._userRequestVersion = (this._userRequestVersion || 0) + 1;
-    this.setData({ loading: false, userLoading: false });
+    this._featuredVersion = (this._featuredVersion || 0) + 1;
+    this.setData({ loading: false, userLoading: false, featured: [], featuredLoading: false });
   },
   onUnload() { this.onHide(); },
   clearResults() {
     this.setData({ posts: [], leftPosts: [], rightPosts: [], page: 0, total: 0, hasMore: false, loading: false, error: '',
       users: [], userPage: 0, userTotal: 0, userHasMore: false, userLoading: false, userError: '' });
+  },
+  clearFeatured() {
+    this._featuredVersion = (this._featuredVersion || 0) + 1;
+    this.setData({ featured: [], featuredLoading: false });
+  },
+  async loadFeatured(user = this.data.user) {
+    if (!user) { this.setData({ featured: [] }); return; }
+    const version = this._featuredVersion = (this._featuredVersion || 0) + 1;
+    this.setData({ featuredLoading: true });
+    try {
+      const result = await api.get('/featured');
+      if (version !== this._featuredVersion) return;
+      if (!result || !Array.isArray(result.items)) throw new Error('精选暂时无法加载');
+      const featured = [];
+      const seen = new Set();
+      for (const item of result.items) {
+        if (!item || typeof item.id !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(item.id) || item.status !== 'approved' || seen.has(item.id)) continue;
+        seen.add(item.id);
+        featured.push(formatPost(item));
+      }
+      this.setData({ featured });
+    } catch (_) {
+      if (version === this._featuredVersion) this.setData({ featured: [] });
+    } finally {
+      if (version === this._featuredVersion) this.setData({ featuredLoading: false });
+    }
+  },
+  openFeatured(event) {
+    const id = event.currentTarget.dataset.id;
+    if (!this.data.featured.some(item => item.id === id)) return;
+    const url = detailPath(id);
+    if (url) wx.navigateTo({ url });
   },
   loadResults(reset = true) { return this.data.searchMode === 'users' ? this.loadUsers(reset) : this.loadPosts(reset); },
   async loadPosts(reset = true) {

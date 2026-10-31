@@ -34,6 +34,8 @@ export class AppController {
   @Get('users/:id/posts') userPosts(@Req() req: { user: any }, @Param('id') id: string, @Query() query: Record<string, unknown>) { return this.service.getUserPosts(req.user, id, query); }
 
   @UseGuards(UserGuard)
+  @Get('featured') featured(@Req() req: { user: any }) { return this.service.featuredPosts(req.user); }
+  @UseGuards(UserGuard)
   @Get('posts') posts(@Req() req: { user: any }, @Query() query: any) { return this.service.listPosts(req.user, query); }
   @UseGuards(UserGuard)
   @Post('posts') createPost(@Req() req: { user: any }, @Body() body: Record<string, unknown>) { return this.service.createPost(req.user, body); }
@@ -96,6 +98,14 @@ export class AppController {
   @Post('admin/reports/:id/resolve')
   @HttpCode(200)
   resolveReport(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: unknown) { return this.service.resolveReport(req.admin, id, body); }
+  @UseGuards(AdminGuard)
+  @Get('admin/featured') adminFeatured(@Req() req: { admin: any }) { return this.service.adminFeatured(req.admin); }
+  @UseGuards(AdminGuard)
+  @Post('admin/featured') createFeatured(@Req() req: { admin: any }, @Body() body: unknown) { return this.service.saveFeatured(req.admin, body); }
+  @UseGuards(AdminGuard)
+  @Patch('admin/featured/:id') updateFeatured(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: unknown) { return this.service.updateFeatured(req.admin, id, body); }
+  @UseGuards(AdminGuard)
+  @Delete('admin/featured/:id') deleteFeatured(@Req() req: { admin: any }, @Param('id') id: string) { return this.service.deleteFeatured(req.admin, id); }
   @UseGuards(AdminGuard)
   @Get('admin/invites') invites(@Req() req: { admin: any }) { return this.service.adminInvites(req.admin); }
   @UseGuards(AdminGuard)

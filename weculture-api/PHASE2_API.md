@@ -102,6 +102,16 @@
 - 新表 `content_reports`，迁移 `1793000000000-ContentReports`；唯一索引防止同一用户重复举报同一对象。生产仍 `synchronize=false`，须先备份再迁移。
 - 本地检查：`test/reports.e2e-spec.ts`（权限、重复、跨校、驳回、下架、评论清空、工作台计数）、`test/content-reports-migration.e2e-spec.ts`（可逆、唯一索引、MySQL SQL）；小程序 `test/reports.test.js`（7项）。全部为本地模拟，未部署、未访问真实 MySQL。
 
+## 运营精选：2026-11-01 本地实现，待配套发布
+
+- `GET /api/v1/featured`（用户登录）：返回 `{items:[...]}`，只含 `featured_posts.status=active` 且内容 `approved` 的精选，按 `sortOrder ASC, createdAt ASC`，最多10条。平台精选对所有登录用户可见；校园精选只对同校认证成员可见；内容下架、驳回、学校不匹配或精选停用自动过滤。
+- `GET /api/v1/admin/featured`（管理员）：`super_admin` 看全部；`operator`／`reviewer` 只看本校；无学校范围拒绝。返回精选记录、内容标题／状态／圈层／学校，内容不存在时 `post=null`。
+- `POST /api/v1/admin/featured`：`{postId,sortOrder?}`；只能精选已发布内容；平台内容由 `super_admin` 配置，校园内容由本校 `operator` 配置；同一内容重复加入视为更新，不重复建行；排序省略保留原值。
+- `PATCH /api/v1/admin/featured/:id`：`{sortOrder?,status?}`；`DELETE /api/v1/admin/featured/:id` 移除精选但不删除内容。写操作记录 `featured.create/update/delete` 审计日志。
+- 新表 `featured_posts`，唯一索引 `postId`，迁移 `1793000001000-FeaturedPosts`；生产仍 `synchronize=false`，须先备份再迁移。
+- 首页仅在默认“最新／全部类型／无搜索”展示横向精选条；读取失败静默隐藏，不影响主列表。小程序 `test/featured-home.test.js` 覆盖过滤、失败、换账号和跳转。
+- 本地检查：`test/featured.e2e-spec.ts`（平台／校园权限、幂等、排序、上下架、下架隐藏、10条上限、401/400）、`test/featured-migration.e2e-spec.ts`（可逆、唯一索引、MySQL SQL）；未部署、未访问真实 MySQL。
+
 ## 迁移与旧数据
 
 迁移 `1791417600000-PostCircles` 新增三个可空字段和圈层分页索引；只将旧 `visibility=school` 分类为 `campus`，保留学校、审核状态、原因、作者与投稿请求标识。

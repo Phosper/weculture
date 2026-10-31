@@ -5,6 +5,17 @@
   <view class="search"><text class="search-mark">⌕</text><input id="home-search" focus="{{searchFocused}}" value="{{q}}" maxlength="100" placeholder="{{searchMode === 'users' ? '搜索作者昵称' : '搜索标题、作者昵称或话题'}}" bindinput="searchInput" confirm-type="search" bindconfirm="search"/><text wx:if="{{q || activeSearch}}" class="search-clear" bindtap="clearSearch">清空</text><text class="search-action" bindtap="search">搜索</text></view>
   <block wx:if="{{searchMode === 'content'}}">
   <view class="assistant-strip" bindtap="toAssistant"><image class="assistant-mark" src="/assets/assistant-avatar.jpg" mode="aspectFill"/><view class="assistant-copy"><text class="assistant-title">校园小C</text><text class="assistant-description">想找活动、发动态，或者整理资料？</text></view><text class="arrow">›</text></view>
+  <view wx:if="{{searchMode === 'content' && !activeSearch && feed === 'latest' && type === 'all' && featured.length}}" class="featured-section">
+    <view class="featured-heading"><text class="section-title">精选</text><text class="feed-subtitle">编辑推荐</text></view>
+    <scroll-view class="featured-scroll" scroll-x="{{true}}" enable-flex="{{true}}" show-scrollbar="{{false}}">
+      <view class="featured-track">
+        <view wx:for="{{featured}}" wx:key="id" class="featured-card" data-id="{{item.id}}" bindtap="openFeatured">
+          <image wx:if="{{item.imageUrl}}" class="featured-image" src="{{item.imageUrl}}" mode="aspectFill" />
+          <view class="featured-copy"><text class="featured-tag">{{item.tag || item.circleLabel}}</text><text class="featured-title">{{item.title}}</text><text class="featured-meta">{{item.author.nickname}} · {{item.createdAtText}}</text></view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
   <view class="feed-tabs"><view wx:for="{{feeds}}" wx:key="key" class="feed-tab {{feed === item.key ? 'selected' : ''}}" data-feed="{{item.key}}" bindtap="changeFeed">{{item.label}}</view></view>
   <view class="type-filters"><view wx:for="{{filters}}" wx:key="key" class="type-filter {{type === item.key ? 'selected' : ''}}" data-type="{{item.key}}" bindtap="changeType">{{item.label}}</view></view>
   <view wx:if="{{type === 'event'}}" class="event-time-panel"><view class="event-time-options"><view wx:for="{{eventTimes}}" wx:key="key" class="event-time-option {{eventTime === item.key ? 'selected' : ''}}" data-event-time="{{item.key}}" bindtap="changeEventTime">{{item.label}}</view></view><text class="event-time-hint">{{eventTime === 'all' ? '选择具体时间，可按北京时间筛选未开始活动；报名状态以详情为准。' : '按北京时间筛选未开始活动；报名状态以详情为准。'}}</text></view>

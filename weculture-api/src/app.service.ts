@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
-import { AdminAccount, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
+import { AdminAccount, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, FeaturedPost, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
 import { adminAuthVersion, createToken, Session } from './auth';
 import { AdminLoginLimiter, DEMO_ADMIN_PASSWORD, validNewAdminPassword } from './admin-security';
 import { previewStoredImage } from './admin-media';
@@ -20,6 +20,7 @@ const POST_QUERY_KEYS = ['scope', 'circle', 'city', 'schoolId', 'type', 'q', 'ta
 const CONTENT_LANGUAGES = ['zh', 'en', 'ru', 'fr', 'es', 'ar', 'other'];
 const REPORT_REASONS = ['spam', 'harassment', 'false_info', 'inappropriate', 'privacy', 'other'] as const;
 const REPORT_STATUSES = ['pending', 'dismissed', 'removed'] as const;
+const FEATURED_STATUSES = ['active', 'inactive'] as const;
 type ReportQuery = { status?: string; targetType?: string; page?: string; pageSize?: string };
 
 @Injectable()
@@ -34,6 +35,7 @@ export class AppService implements OnModuleInit {
     @InjectRepository(Post) private posts: Repository<Post>,
     @InjectRepository(PostComment) private comments: Repository<PostComment>,
     @InjectRepository(ContentReport) private reports: Repository<ContentReport>,
+    @InjectRepository(FeaturedPost) private featured: Repository<FeaturedPost>,
     @InjectRepository(Event) private events: Repository<Event>,
     @InjectRepository(EventRegistration) private registrations: Repository<EventRegistration>,
     @InjectRepository(Like) private likes: Repository<Like>,
@@ -358,6 +360,27 @@ export class AppService implements OnModuleInit {
   }
 
   async getPost(session: UserSession, postId: string) { await this.currentUser(session); return this.decoratePost(await this.visiblePost(postId, session.id, true), session.id); }
+  async featuredPosts(session: UserSession) {
+    await this.currentUser(session);
+    const member = await this.memberships.findOneBy({ userId: session.id, verificationStatus: 'verified' });
+    const rows = await this.featured.find({ where: { status: 'active' }, order: { sortOrder: 'ASC', createdAt: 'ASC' }, take: 50 });
+    if (!rows.length) return { items: [] };
+    const posts = await this.posts.findBy({ id: In(rows.map((row) => row.postId)) });
+    const postMap = new Map(posts.map((post) => [post.id, post]));
+    const visible: Post[] = [];
+    for (const row of rows) {
+      const post = postMap.get(row.postId);
+      if (!post || post.status !== 'approved') continue;
+      if (row.scope === 'platform') {
+        if (row.schoolId || post.visibility !== 'platform' || post.schoolId || (post.circle !== null && post.circle !== 'city' && post.circle !== 'international')) continue;
+      } else {
+        if (!member || !row.schoolId || row.schoolId !== post.schoolId || member.schoolId !== post.schoolId || post.visibility !== 'school' || post.circle !== 'campus') continue;
+      }
+      visible.push(post);
+      if (visible.length >= 10) break;
+    }
+    return { items: await Promise.all(visible.map((post) => this.decoratePost(post, session.id))) };
+  }
   private async commentPost(manager: EntityManager, session: UserSession, postId: string, write = false) {
     const lock = write && this.dataSource.options.type === 'mysql';
     const userQuery = manager.getRepository(User).createQueryBuilder('user').where('user.id = :userId', { userId: session.id });
@@ -978,6 +1001,97 @@ export class AppService implements OnModuleInit {
       return updated;
     });
     return { id: saved.id, status: saved.status, handledAt: saved.handledAt, resolution: saved.resolution };
+  }
+  async adminFeatured(session: AdminSession) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator', 'reviewer');
+    const rows = await this.featured.find({ order: { sortOrder: 'ASC', createdAt: 'ASC' } });
+    if (admin.role === 'super_admin') return this.decorateFeatured(rows);
+    if (!admin.schoolId) throw new ForbiddenException('无学校范围');
+    return this.decorateFeatured(rows.filter((row) => row.schoolId === admin.schoolId));
+  }
+  private ensureFeaturedScope(admin: AdminSession, scope: 'platform' | 'school', schoolId: string | null) {
+    if (admin.role === 'super_admin') return;
+    if (admin.role !== 'operator' || !admin.schoolId || scope !== 'school' || schoolId !== admin.schoolId) throw new ForbiddenException('只能精选本校校园圈内容');
+  }
+  private async decorateFeatured(rows: FeaturedPost[]) {
+    if (!rows.length) return [];
+    const posts = await this.posts.findBy({ id: In(rows.map((row) => row.postId)) });
+    const schoolIds = [...new Set(rows.map((row) => row.schoolId).filter((id): id is string => Boolean(id)))];
+    const schools = schoolIds.length ? await this.schools.findBy({ id: In(schoolIds) }) : [];
+    const postMap = new Map(posts.map((post) => [post.id, post]));
+    const schoolMap = new Map(schools.map((school) => [school.id, school]));
+    return rows.map((row) => {
+      const post = postMap.get(row.postId), school = row.schoolId ? schoolMap.get(row.schoolId) : undefined;
+      return {
+        id: row.id, postId: row.postId, scope: row.scope, schoolId: row.schoolId, sortOrder: row.sortOrder, status: row.status,
+        createdBy: row.createdBy, createdAt: row.createdAt, updatedAt: row.updatedAt,
+        post: post ? { id: post.id, title: post.title, status: post.status, visibility: post.visibility, circle: post.circle, schoolId: post.schoolId, authorId: post.authorId, imageUrl: post.imageUrl, tag: post.tag } : null,
+        school: school ? { id: school.id, name: school.name, shortName: school.shortName } : null,
+      };
+    });
+  }
+  async saveFeatured(session: AdminSession, body: unknown) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator');
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('精选参数无效');
+    const data = body as Record<string, unknown>;
+    if (Object.keys(data).some((key) => !['postId', 'sortOrder'].includes(key))) throw new BadRequestException('精选参数无效');
+    const postId = typeof data.postId === 'string' ? data.postId.trim() : '';
+    if (!postId || postId.length > 80) throw new BadRequestException('精选内容无效');
+    const existing = await this.featured.findOneBy({ postId });
+    const sortOrder = data.sortOrder === undefined ? (existing?.sortOrder ?? 0) : data.sortOrder;
+    if (typeof sortOrder !== 'number' || !Number.isInteger(sortOrder) || sortOrder < 0 || sortOrder > 9999) throw new BadRequestException('排序号应为0至9999的整数');
+    const post = await this.posts.findOneBy({ id: postId });
+    if (!post) throw new NotFoundException('内容不存在');
+    if (post.status !== 'approved') throw new BadRequestException('只能精选已发布内容');
+    const platform = post.visibility === 'platform' && !post.schoolId && (post.circle === null || post.circle === 'city' || post.circle === 'international');
+    const campus = post.visibility === 'school' && post.circle === 'campus' && Boolean(post.schoolId);
+    if (!platform && !campus) throw new BadRequestException('内容圈层与精选范围不一致，请先编辑内容');
+    const scope: 'platform' | 'school' = platform ? 'platform' : 'school';
+    const schoolId = campus ? post.schoolId : null;
+    this.ensureFeaturedScope(admin, scope, schoolId);
+    const saved = existing
+      ? await this.featured.save(this.featured.merge(existing, { scope, schoolId, sortOrder, status: 'active' }))
+      : await this.featured.save(this.featured.create({ postId, scope, schoolId, sortOrder, status: 'active', createdBy: admin.id }));
+    await this.audit(admin, existing ? 'featured.update' : 'featured.create', 'featured', saved.id, JSON.stringify({ postId, scope, schoolId, sortOrder }));
+    const [item] = await this.decorateFeatured([saved]);
+    return item;
+  }
+  async updateFeatured(session: AdminSession, id: string, body: unknown) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator');
+    if (typeof id !== 'string' || !id || id.length > 80) throw new BadRequestException('精选记录无效');
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('精选参数无效');
+    const data = body as Record<string, unknown>;
+    if (Object.keys(data).some((key) => !['sortOrder', 'status'].includes(key))) throw new BadRequestException('精选参数无效');
+    if (data.sortOrder === undefined && data.status === undefined) throw new BadRequestException('没有需要更新的字段');
+    const row = await this.featured.findOneBy({ id });
+    if (!row) throw new NotFoundException('精选记录不存在');
+    this.ensureFeaturedScope(admin, row.scope, row.schoolId);
+    if (data.sortOrder !== undefined) {
+      if (typeof data.sortOrder !== 'number' || !Number.isInteger(data.sortOrder) || data.sortOrder < 0 || data.sortOrder > 9999) throw new BadRequestException('排序号应为0至9999的整数');
+      row.sortOrder = data.sortOrder;
+    }
+    if (data.status !== undefined) {
+      if (typeof data.status !== 'string' || !FEATURED_STATUSES.includes(data.status as typeof FEATURED_STATUSES[number])) throw new BadRequestException('精选状态无效');
+      row.status = data.status as FeaturedPost['status'];
+    }
+    await this.featured.save(row);
+    await this.audit(admin, 'featured.update', 'featured', row.id, JSON.stringify({ sortOrder: row.sortOrder, status: row.status }));
+    const [item] = await this.decorateFeatured([row]);
+    return item;
+  }
+  async deleteFeatured(session: AdminSession, id: string) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator');
+    if (typeof id !== 'string' || !id || id.length > 80) throw new BadRequestException('精选记录无效');
+    const row = await this.featured.findOneBy({ id });
+    if (!row) throw new NotFoundException('精选记录不存在');
+    this.ensureFeaturedScope(admin, row.scope, row.schoolId);
+    await this.featured.delete(row.id);
+    await this.audit(admin, 'featured.delete', 'featured', row.id, JSON.stringify({ postId: row.postId, scope: row.scope, schoolId: row.schoolId }));
+    return { deleted: true, id: row.id };
   }
   async adminInvites(admin: AdminSession) { this.requireAdminRole(admin, 'super_admin', 'operator'); if (!admin.schoolId && admin.role !== 'super_admin') throw new ForbiddenException('无学校范围'); return this.invites.findBy({ schoolId: admin.schoolId || (await this.schools.findOneOrFail({ where: { status: 'active' } })).id }); }
   async createInvite(admin: AdminSession, data: { batchName: string; maxUses: number; expiresAt?: string; schoolId?: string }) { this.requireAdminRole(admin, 'super_admin', 'operator'); const schoolId = admin.schoolId || data.schoolId || ''; if (!schoolId) throw new BadRequestException('请选择学校'); this.ensureAdminScope(admin, schoolId); const code = `WC${Math.random().toString(36).slice(2, 8).toUpperCase()}`; const invite = await this.invites.save(this.invites.create({ schoolId, code, batchName: data.batchName?.trim() || '后台创建', maxUses: Math.max(1, Number(data.maxUses) || 1), expiresAt: data.expiresAt ? new Date(data.expiresAt) : null })); await this.audit(admin, 'invite.create', 'invite', invite.id, invite.batchName); return invite; }
