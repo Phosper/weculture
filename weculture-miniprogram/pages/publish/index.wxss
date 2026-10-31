@@ -34,3 +34,6 @@
 .notice { padding: 18rpx 10rpx; font-size: calc(22rpx * var(--font-scale, 1)); color: #79747E; line-height: 1.5; }
 .publish-intro { margin: 4rpx 0 28rpx; }
 .publish-intro .subtle { margin-top: 10rpx; }
+.draft-note { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin: -8rpx 0 18rpx; padding: 16rpx 20rpx; border: 1rpx solid #E9DAD0; border-radius: 14rpx; background: #FCF6F1; color: #77665D; font-size: calc(22rpx * var(--font-scale, 1)); line-height: 1.6; }
+.draft-note text { flex: 1; min-width: 0; }
+.draft-note button { flex-shrink: 0; margin: 0; padding: 0 10rpx; font-size: calc(22rpx * var(--font-scale, 1)); }

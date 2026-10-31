@@ -4,11 +4,12 @@ const { submissionData, reviewInfo } = require('../../utils/publication');
 const { CIRCLES, CONTENT_LANGUAGES, normalizeCity, cityFromRegion, readCity, readCityRegion, saveCity } = require('../../utils/circles');
 const { getCurrentCity, LOCATION_SCOPE } = require('../../utils/location');
 const { FEATURES } = require('../../utils/features');
+const { readDraft, writeDraft, clearDraft: clearStoredDraft } = require('../../utils/publication-draft');
 const pad = (value) => String(value).padStart(2, '0');
 const datePart = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 const timePart = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 Page(withTypography({
-  data: { ...getNavMetrics(), automaticCityLocationEnabled: FEATURES.automaticCityLocation, user: null, circle: 'campus', circles: CIRCLES, city: '', cityRegion: [], locating: false, locationError: '', locationSettings: false, contentLanguage: 'zh', languageIndex: 0, languages: CONTENT_LANGUAGES, type: 'dynamic', title: '', content: '', tag: '', price: '', location: '', startDate: '', startTime: '', endDate: '', endTime: '', deadlineDate: '', deadlineTime: '', capacity: 30, imageTempPath: '', error: '', submitting: false },
+  data: { ...getNavMetrics(), automaticCityLocationEnabled: FEATURES.automaticCityLocation, user: null, circle: 'campus', circles: CIRCLES, city: '', cityRegion: [], locating: false, locationError: '', locationSettings: false, contentLanguage: 'zh', languageIndex: 0, languages: CONTENT_LANGUAGES, type: 'dynamic', title: '', content: '', tag: '', price: '', location: '', startDate: '', startTime: '', endDate: '', endTime: '', deadlineDate: '', deadlineTime: '', capacity: 30, imageTempPath: '', error: '', submitting: false, draftRestored: false },
   onLoad() { const start = new Date(Date.now() + 24 * 60 * 60 * 1000); start.setHours(9, 0, 0, 0); const end = new Date(start.getTime() + 3 * 60 * 60 * 1000); const deadline = new Date(start.getTime() - 2 * 60 * 60 * 1000); this.setData({ startDate: datePart(start), startTime: timePart(start), endDate: datePart(end), endTime: timePart(end), deadlineDate: datePart(deadline), deadlineTime: timePart(deadline) }); },
   async onShow() {
     selectTab(this, 2);
@@ -16,12 +17,23 @@ Page(withTypography({
     if (!user) { this.setData({ user: null }); return; }
     const entry = getApp().globalData.publishEntry;
     delete getApp().globalData.publishEntry;
-    const circle = entry && CIRCLES[entry.circle] ? entry.circle : this.data.circle;
-    const city = normalizeCity(entry && entry.city) || this.data.city || readCity();
-    this.setData({ user, circle: !user.verified && circle === 'campus' && !entry ? 'city' : circle, city, cityRegion: city === this.data.city && this.data.cityRegion.length ? this.data.cityRegion : readCityRegion(city) });
+    const draft = readDraft(wx, user.id);
+    if (draft) {
+      const circle = !user.verified && draft.circle === 'campus' ? 'city' : draft.circle;
+      const city = circle === 'city' ? (normalizeCity(draft.city) || readCity()) : '';
+      const languageIndex = Math.max(0, CONTENT_LANGUAGES.findIndex(item => item.value === draft.contentLanguage));
+      this.setData({ user, circle, city, cityRegion: circle === 'city' ? readCityRegion(city) : [], contentLanguage: draft.contentLanguage, languageIndex,
+        type: draft.type, title: draft.title, content: draft.content, tag: draft.tag, price: draft.price, location: draft.location,
+        startDate: draft.startDate, startTime: draft.startTime, endDate: draft.endDate, endTime: draft.endTime,
+        deadlineDate: draft.deadlineDate, deadlineTime: draft.deadlineTime, capacity: draft.capacity, draftRestored: true, error: '' });
+    } else {
+      const circle = entry && CIRCLES[entry.circle] ? entry.circle : this.data.circle;
+      const city = normalizeCity(entry && entry.city) || this.data.city || readCity();
+      this.setData({ user, circle: !user.verified && circle === 'campus' && !entry ? 'city' : circle, city, cityRegion: city === this.data.city && this.data.cityRegion.length ? this.data.cityRegion : readCityRegion(city), draftRestored: false });
+    }
     if (this.publishedResult) { this.publishedResult = null; this.setData({ submitting: false }); }
   },
-  selectCircle(e) { const circle = e.currentTarget.dataset.circle; if (!this.data.submitting && CIRCLES[circle]) { this.cancelLocation(); this.setData({ circle, error: '', locationError: '', locationSettings: false }); } },
+  selectCircle(e) { const circle = e.currentTarget.dataset.circle; if (!this.data.submitting && CIRCLES[circle]) { this.cancelLocation(); this.setData({ circle, error: '', locationError: '', locationSettings: false }); this.saveDraft(); } },
   chooseCity(e) {
     if (this.data.submitting) return;
     const cityRegion = e.detail.value;
@@ -29,10 +41,21 @@ Page(withTypography({
     if (!city || city.length > 50) { this.setData({ error: '请选择有效的城市' }); return; }
     this.cancelLocation();
     this.setData({ city, cityRegion, error: '', locationError: '', locationSettings: false });
+    this.saveDraft();
   },
   cancelLocation() { this._locationVersion = (this._locationVersion || 0) + 1; this.setData({ locating: false }); },
-  onHide() { this.cancelLocation(); },
-  onUnload() { this.cancelLocation(); },
+  onHide() { this.saveDraft(); this.cancelLocation(); },
+  onUnload() { this.saveDraft(); this.cancelLocation(); },
+  saveDraft() {
+    const user = this.data.user || getApp().globalData.user;
+    if (!user || !user.id || this.data.submitting) return false;
+    return writeDraft(wx, user.id, this.data);
+  },
+  clearDraft() {
+    const user = this.data.user;
+    if (user && user.id) clearStoredDraft(wx, user.id);
+    this.setData({ title: '', content: '', tag: '', price: '', location: '', imageTempPath: '', draftRestored: false, error: '' });
+  },
   async locateCity() {
     if (!FEATURES.automaticCityLocation || this.data.locating || this.data.submitting || this.data.circle !== 'city' || !this.data.user) return;
     const version = (this._locationVersion || 0) + 1;
@@ -42,6 +65,7 @@ Page(withTypography({
       const { city, cityRegion } = await getCurrentCity(() => version === this._locationVersion);
       if (version !== this._locationVersion) return;
       this.setData({ city, cityRegion, error: '' });
+      this.saveDraft();
     } catch (error) {
       if (version === this._locationVersion) this.setData({ locationError: error.message || '定位失败，请手动选择城市。', locationSettings: error.code === 'LOCATION_PERMISSION' });
     } finally { if (version === this._locationVersion) this.setData({ locating: false }); }
@@ -50,9 +74,11 @@ Page(withTypography({
     if (!FEATURES.automaticCityLocation || this.data.submitting) return;
     wx.openSetting({ success: result => { if (result.authSetting && result.authSetting[LOCATION_SCOPE]) this.locateCity(); } });
   },
-  selectLanguage(e) { const languageIndex = Number(e.detail.value); if (!this.data.submitting && CONTENT_LANGUAGES[languageIndex]) this.setData({ languageIndex, contentLanguage: CONTENT_LANGUAGES[languageIndex].value }); },
+  selectLanguage(e) { const languageIndex = Number(e.detail.value); if (!this.data.submitting && CONTENT_LANGUAGES[languageIndex]) { this.setData({ languageIndex, contentLanguage: CONTENT_LANGUAGES[languageIndex].value }); this.saveDraft(); } },
   verify() { if (!this.data.submitting) wx.navigateTo({ url: '/pages/verify/index' }); },
-  selectType(e) { if (!this.data.submitting) this.setData({ type: e.currentTarget.dataset.type }); }, input(e) { if (!this.data.submitting) this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); }, pick(e) { if (!this.data.submitting) this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); },
+  selectType(e) { if (!this.data.submitting) { this.setData({ type: e.currentTarget.dataset.type }); this.saveDraft(); } },
+  input(e) { if (this.data.submitting) return; this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); this.saveDraft(); },
+  pick(e) { if (this.data.submitting) return; this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); this.saveDraft(); },
   chooseImage() { if (this.data.submitting) return; wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], success: (result) => { if (!this.data.submitting && result.tempFiles && result.tempFiles[0]) this.setData({ imageTempPath: result.tempFiles[0].tempFilePath }); } }); },
   removeImage() { if (!this.data.submitting) this.setData({ imageTempPath: '' }); },
   async uploadImage(imageTempPath) {
@@ -87,12 +113,13 @@ Page(withTypography({
       const result = await api.post('/posts', { ...data, imageUrl: attempt.imageUrl, clientRequestId: attempt.clientRequestId });
       if (!result || !result.id || !['pending', 'approved', 'rejected', 'offline'].includes(result.status)) throw new Error('暂未确认投稿结果，请重试或到“我的投稿”查看');
       wx.removeStorageSync(storageKey);
+      clearStoredDraft(wx, user.id);
       this.publishedResult = result;
       this.publishedCircle = { circle: result.circle || data.circle, city: result.city || data.city || '' };
       if (data.circle === 'city') { try { saveCity(data.city, this.data.cityRegion); } catch (_) {} }
-      this.setData({ title: '', content: '', tag: '', price: '', location: '', imageTempPath: '' });
+      this.setData({ title: '', content: '', tag: '', price: '', location: '', imageTempPath: '', draftRestored: false });
       this.showResult(result);
-    } catch (error) { this.setData({ error: error.message || '提交失败，请检查网络后重试', submitting: false }); }
+    } catch (error) { this.setData({ error: error.message || '提交失败，请检查网络后重试', submitting: false }); this.saveDraft(); }
   },
   showResult(result) {
     const approved = result.status === 'approved';

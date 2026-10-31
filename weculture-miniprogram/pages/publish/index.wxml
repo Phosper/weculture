@@ -2,6 +2,7 @@
 <view class="topbar" style="padding-top:{{statusBarHeight}}px;height:{{navBarHeight}}px"><view class="topbar-inner" style="height:{{navContentHeight}}px;padding-right:{{navRightInset}}px"><view class="brand-lockup"><text class="topbar-brand">Weculture</text><text class="brand-subtitle">让文化融入生活</text></view></view></view>
 <view class="page tab-page publish-page">
   <view class="publish-intro"><view class="title">分享你的文化故事</view><view class="subtle">一张照片、一场活动，都能让更多人走近文化。</view></view>
+  <view wx:if="{{draftRestored}}" class="draft-note"><text>已恢复上次未提交的文字草稿</text><button class="button-plain" bindtap="clearDraft">清除草稿</button></view>
   <view class="tabs"><view wx:for="{{['dynamic','event','market']}}" wx:key="*this" class="tab {{type === item ? 'active' : ''}}" data-type="{{item}}" bindtap="selectType">{{item === 'dynamic' ? '动态' : item === 'event' ? '活动' : '闲置'}}</view></view>
   <view class="card form">
     <view class="label">发布到</view><view class="audience"><view class="{{circle === 'city' ? 'active' : ''}}" data-circle="city" bindtap="selectCircle">同城</view><view class="{{circle === 'international' ? 'active' : ''}}" data-circle="international" bindtap="selectCircle">国际圈</view><view class="{{circle === 'campus' ? 'active' : ''}}" data-circle="campus" bindtap="selectCircle">校园圈</view></view>
