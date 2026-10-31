@@ -99,6 +99,8 @@ export class AppController {
   @HttpCode(200)
   resolveReport(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: unknown) { return this.service.resolveReport(req.admin, id, body); }
   @UseGuards(AdminGuard)
+  @Get('admin/analytics') adminAnalytics(@Req() req: { admin: any }, @Query() query: Record<string, unknown>) { return this.service.adminAnalytics(req.admin, query); }
+  @UseGuards(AdminGuard)
   @Get('admin/featured') adminFeatured(@Req() req: { admin: any }) { return this.service.adminFeatured(req.admin); }
   @UseGuards(AdminGuard)
   @Post('admin/featured') createFeatured(@Req() req: { admin: any }, @Body() body: unknown) { return this.service.saveFeatured(req.admin, body); }

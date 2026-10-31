@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AuditOutlined, BookOutlined, DashboardOutlined, FlagOutlined, KeyOutlined, LogoutOutlined, MessageOutlined, SafetyCertificateOutlined, StarOutlined, TeamOutlined } from '@ant-design/icons';
+import { AuditOutlined, BarChartOutlined, BookOutlined, DashboardOutlined, FlagOutlined, KeyOutlined, LogoutOutlined, MessageOutlined, SafetyCertificateOutlined, StarOutlined, TeamOutlined } from '@ant-design/icons';
 import { Alert, App as AntApp, Button, Card, Col, ConfigProvider, Form, Input, Layout, Menu, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { ApiError, client, onSessionExpired } from './api';
 import { Posts, type Admin } from './posts';
 import { Reports } from './reports';
 import { Featured } from './featured';
+import { Analytics } from './analytics';
 import './style.css';
 
 const reviewScope = import.meta.env.VITE_ADMIN_SCOPE === 'review';
@@ -50,8 +51,8 @@ function Console({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
   const [key, setKey] = useState('dashboard');
   const [passwordOpen, setPasswordOpen] = useState(false);
   const canManage = admin.role === 'super_admin' || (admin.role === 'operator' && Boolean(admin.schoolId));
-  const content = key === 'featured' ? <Featured /> : key === 'reports' ? <Reports /> : key === 'posts' ? <Posts admin={admin} /> : !reviewScope && canManage && key === 'invites' ? <Invites /> : !reviewScope && canManage && key === 'routes' ? <ResourceManager kind="route" /> : !reviewScope && canManage && key === 'knowledge' ? <ResourceManager kind="knowledge" /> : !reviewScope && canManage && key === 'users' ? <Users /> : <Dashboard />;
-  const items = [{ key: 'dashboard', icon: <DashboardOutlined />, label: '工作台' }, { key: 'posts', icon: <SafetyCertificateOutlined />, label: canManage ? '内容审核与发布' : '内容审核' }, { key: 'reports', icon: <FlagOutlined />, label: '举报处理' }, ...(!reviewScope && canManage ? [{ key: 'featured', icon: <StarOutlined />, label: '运营精选' }, { key: 'invites', icon: <KeyOutlined />, label: '邀请码' }, { key: 'routes', icon: <BookOutlined />, label: '旅行路线' }, { key: 'knowledge', icon: <MessageOutlined />, label: '小C知识库' }, { key: 'users', icon: <TeamOutlined />, label: '校内成员' }] : [])];
+  const content = key === 'analytics' ? <Analytics admin={admin} /> : key === 'featured' ? <Featured /> : key === 'reports' ? <Reports /> : key === 'posts' ? <Posts admin={admin} /> : !reviewScope && canManage && key === 'invites' ? <Invites /> : !reviewScope && canManage && key === 'routes' ? <ResourceManager kind="route" /> : !reviewScope && canManage && key === 'knowledge' ? <ResourceManager kind="knowledge" /> : !reviewScope && canManage && key === 'users' ? <Users /> : <Dashboard />;
+  const items = [{ key: 'dashboard', icon: <DashboardOutlined />, label: '工作台' }, { key: 'posts', icon: <SafetyCertificateOutlined />, label: canManage ? '内容审核与发布' : '内容审核' }, { key: 'reports', icon: <FlagOutlined />, label: '举报处理' }, ...(!reviewScope && canManage ? [{ key: 'featured', icon: <StarOutlined />, label: '运营精选' }, { key: 'analytics', icon: <BarChartOutlined />, label: '数据统计' }, { key: 'invites', icon: <KeyOutlined />, label: '邀请码' }, { key: 'routes', icon: <BookOutlined />, label: '旅行路线' }, { key: 'knowledge', icon: <MessageOutlined />, label: '小C知识库' }, { key: 'users', icon: <TeamOutlined />, label: '成员' }] : [])];
   const roleLabel = admin.role === 'super_admin' ? '平台超级管理员' : admin.role === 'reviewer' ? '学校内容审核员' : '学校运营管理员';
   return <Layout className="shell"><Layout.Sider breakpoint="lg" collapsedWidth="0" className="sider"><div className="logo">Weculture<span>{reviewScope ? '线上审核' : '运营后台'}</span></div><Menu theme="dark" mode="inline" selectedKeys={[key]} items={items} onClick={(event) => setKey(event.key)} /><div className="sider-footer"><div>{admin.username}</div><small>{roleLabel}</small><Space direction="vertical"><Button icon={<KeyOutlined />} type="text" onClick={() => setPasswordOpen(true)}>修改密码</Button><Button icon={<LogoutOutlined />} type="text" onClick={onLogout}>退出</Button></Space></div></Layout.Sider><Layout><Layout.Header className="topbar"><span><AuditOutlined /> {reviewScope ? '线上投稿审核 · 所有处理均记录审计日志' : '所有管理操作均记录审计日志'}</span></Layout.Header><Layout.Content className="content">{content}</Layout.Content></Layout><ChangePassword open={passwordOpen} onClose={() => setPasswordOpen(false)} onChanged={onLogout} /></Layout>;
 }

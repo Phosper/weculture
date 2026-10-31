@@ -202,4 +202,18 @@ export class FeaturedPost extends BaseEntity {
   @Column({ length: 36 }) createdBy!: string;
 }
 
-export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport, FeaturedPost];
+@Entity('analytics_events')
+@Index('IDX_analytics_events_code_created', ['eventCode', 'createdAt'])
+@Index('IDX_analytics_events_school_created', ['schoolId', 'createdAt'])
+@Index('IDX_analytics_events_dedupe', ['dedupeKey'], { unique: true })
+export class AnalyticsEvent extends BaseEntity {
+  @Column({ length: 40 }) eventCode!: string;
+  @Column({ type: 'varchar', length: 36, nullable: true }) schoolId!: string | null;
+  @Column({ type: 'varchar', length: 64, nullable: true }) actorHash!: string | null;
+  @Column({ type: 'varchar', length: 20, nullable: true }) targetType!: string | null;
+  @Column({ type: 'varchar', length: 80, nullable: true }) targetId!: string | null;
+  @Column('text') properties!: string;
+  @Column({ length: 120 }) dedupeKey!: string;
+}
+
+export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport, FeaturedPost, AnalyticsEvent];

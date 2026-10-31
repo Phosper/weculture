@@ -112,6 +112,14 @@
 - 首页仅在默认“最新／全部类型／无搜索”展示横向精选条；读取失败静默隐藏，不影响主列表。小程序 `test/featured-home.test.js` 覆盖过滤、失败、换账号和跳转。
 - 本地检查：`test/featured.e2e-spec.ts`（平台／校园权限、幂等、排序、上下架、下架隐藏、10条上限、401/400）、`test/featured-migration.e2e-spec.ts`（可逆、唯一索引、MySQL SQL）；未部署、未访问真实 MySQL。
 
+## 最小事件统计：2026-11-01 本地实现，待配套发布
+
+- 新增 `analytics_events` 表，迁移 `1793000002000-AnalyticsEvents`；唯一 `dedupeKey`，索引 `(eventCode,createdAt)`、`(schoolId,createdAt)`。
+- 服务端记录：`search_performed`（内容／用户搜索，只存结果分桶，不存关键词）、`post_viewed`、`post_published`、`post_reviewed`（延迟分桶）、`comment_created`（重试复用请求不重复）、`event_registered`（重复报名不重复）、`event_cancelled`。`actorHash` 为服务端 HMAC，不存可逆身份。
+- `GET /api/v1/admin/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD&schoolId=`：`super_admin` 全量，`operator` 仅本校，`reviewer` 无权限；范围最多31天，按北京时间自然日。返回 `{from,to,schoolId,items,totals,truncated}`；`items` 按日／事件编码返回 `count`、`uniqueActors`，不返回用户、对象明细或原始属性。
+- 后台新增“数据统计”界面；读取审计、导出、原始事件清理、日聚合表和 `session_started` 回访事件未实现。
+- 本地检查：`test/analytics.e2e-spec.ts`（事件写入、去重、日期聚合、学校范围、权限、日期校验）、`test/analytics-migration.e2e-spec.ts`（可逆、唯一索引、MySQL SQL）。未部署、未访问真实 MySQL。
+
 ## 迁移与旧数据
 
 迁移 `1791417600000-PostCircles` 新增三个可空字段和圈层分页索引；只将旧 `visibility=school` 分类为 `campus`，保留学校、审核状态、原因、作者与投稿请求标识。

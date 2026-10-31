@@ -1,14 +1,14 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
-import { AdminAccount, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, FeaturedPost, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
+import { AdminAccount, AnalyticsEvent, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, FeaturedPost, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
 import { adminAuthVersion, createToken, Session } from './auth';
 import { AdminLoginLimiter, DEMO_ADMIN_PASSWORD, validNewAdminPassword } from './admin-security';
 import { previewStoredImage } from './admin-media';
 import { DbRetry } from './db-retry';
-import { getSeedValue, isDemoSeedEnabled, isProduction } from './config';
+import { getJwtSecret, getSeedValue, isDemoSeedEnabled, isProduction } from './config';
 import { EVENT_TIME_FILTERS, eventTimeBounds } from './event-time-filter';
 
 type UserSession = Session & { kind: 'user' };
@@ -36,6 +36,7 @@ export class AppService implements OnModuleInit {
     @InjectRepository(PostComment) private comments: Repository<PostComment>,
     @InjectRepository(ContentReport) private reports: Repository<ContentReport>,
     @InjectRepository(FeaturedPost) private featured: Repository<FeaturedPost>,
+    @InjectRepository(AnalyticsEvent) private analytics: Repository<AnalyticsEvent>,
     @InjectRepository(Event) private events: Repository<Event>,
     @InjectRepository(EventRegistration) private registrations: Repository<EventRegistration>,
     @InjectRepository(Like) private likes: Repository<Like>,
@@ -130,6 +131,33 @@ export class AppService implements OnModuleInit {
     return post;
   }
   private async audit(admin: AdminSession, action: string, resourceType: string, resourceId: string, detail = '') { await this.audits.save(this.audits.create({ adminId: admin.id, schoolId: admin.schoolId || null, action, resourceType, resourceId, detail })); }
+  private analyticsActor(userId: string) { return createHmac('sha256', getJwtSecret()).update(`analytics:${userId}`).digest('hex').slice(0, 64); }
+  private resultBucket(count: number) { return count === 0 ? '0' : count <= 5 ? '1-5' : count <= 20 ? '6-20' : '21+'; }
+  private latencyBucket(seconds: number) { return seconds < 60 ? '<1m' : seconds < 3600 ? '1-60m' : seconds < 86400 ? '1-24h' : '>24h'; }
+  private async recordEvent(input: { eventCode: string; userId?: string; schoolId?: string | null; targetType?: string; targetId?: string; properties?: Record<string, unknown>; dedupeKey?: string }) {
+    try {
+      await this.analytics.save(this.analytics.create({
+        eventCode: input.eventCode,
+        schoolId: input.schoolId || null,
+        actorHash: input.userId ? this.analyticsActor(input.userId) : null,
+        targetType: input.targetType || null,
+        targetId: input.targetId || null,
+        properties: JSON.stringify(input.properties || {}),
+        dedupeKey: input.dedupeKey || randomUUID(),
+      }));
+    } catch (_) {
+      // Analytics must never block the business action or its response.
+    }
+  }
+  private beijingDateKey(date: Date) { return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10); }
+  private beijingDateOffset(days: number) { const shifted = new Date(Date.now() + 8 * 60 * 60 * 1000); shifted.setUTCDate(shifted.getUTCDate() + days); return shifted.toISOString().slice(0, 10); }
+  private analyticsDate(value: unknown, fallback: string) {
+    if (value === undefined) return fallback;
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException('日期格式应为 YYYY-MM-DD');
+    const parsed = new Date(`${value}T00:00:00+08:00`);
+    if (Number.isNaN(+parsed) || this.beijingDateKey(parsed) !== value) throw new BadRequestException('日期无效');
+    return value;
+  }
   private ensureAdminScope(admin: AdminSession, schoolId: string | null) { if (admin.role !== 'super_admin' && (!schoolId || admin.schoolId !== schoolId)) throw new ForbiddenException('无权操作该学校资源'); }
   private requireAdminRole(admin: AdminSession, ...roles: Array<NonNullable<AdminSession['role']>>) { if (!admin.role || !roles.includes(admin.role)) throw new ForbiddenException('当前管理员角色无权执行此操作'); }
   private async activeAdmin(session: AdminSession) {
@@ -284,9 +312,12 @@ export class AppService implements OnModuleInit {
     this.applyPostFilters(qb, query);
     if (pagination.enabled) {
       const [posts, total] = await qb.skip((pagination.page - 1) * pagination.pageSize).take(pagination.pageSize).getManyAndCount();
+      if (query.q?.trim()) await this.recordEvent({ eventCode: 'search_performed', userId: session.id, schoolId: member?.schoolId || null, properties: { mode: 'content', resultBucket: this.resultBucket(total) } });
       return { items: await Promise.all(posts.map((post) => this.decoratePost(post, session.id))), page: pagination.page, pageSize: pagination.pageSize, total, hasMore: pagination.page * pagination.pageSize < total };
     }
-    return Promise.all((await qb.getMany()).map((post) => this.decoratePost(post, session.id)));
+    const posts = await qb.getMany();
+    if (query.q?.trim()) await this.recordEvent({ eventCode: 'search_performed', userId: session.id, schoolId: member?.schoolId || null, properties: { mode: 'content', resultBucket: this.resultBucket(posts.length) } });
+    return Promise.all(posts.map((post) => this.decoratePost(post, session.id)));
   }
 
   // Discovery and public author pages must use the same conservative predicate,
@@ -337,6 +368,7 @@ export class AppService implements OnModuleInit {
     const total = await qb.getCount();
     const items = await qb.orderBy(nickname, 'ASC').addOrderBy('user.id', 'ASC').offset((page - 1) * pageSize).limit(pageSize)
       .getRawMany<{ id: string; nickname: string; avatarUrl: string; visiblePostCount: string | number }>();
+    await this.recordEvent({ eventCode: 'search_performed', userId: session.id, schoolId: member?.schoolId || null, properties: { mode: 'users', resultBucket: this.resultBucket(total) } });
     return { items: items.map((item) => ({ ...item, visiblePostCount: Number(item.visiblePostCount) })), page, pageSize, total, hasMore: page * pageSize < total };
   }
 
@@ -359,7 +391,12 @@ export class AppService implements OnModuleInit {
     return { items: await Promise.all(posts.map((post) => this.decoratePost(post, session.id))), page, pageSize, total, hasMore: page * pageSize < total };
   }
 
-  async getPost(session: UserSession, postId: string) { await this.currentUser(session); return this.decoratePost(await this.visiblePost(postId, session.id, true), session.id); }
+  async getPost(session: UserSession, postId: string) {
+    await this.currentUser(session);
+    const post = await this.visiblePost(postId, session.id, true);
+    if (post.status === 'approved') await this.recordEvent({ eventCode: 'post_viewed', userId: session.id, schoolId: post.schoolId, targetType: 'post', targetId: post.id, properties: { postType: post.type, circle: post.circle, source: 'detail' } });
+    return this.decoratePost(post, session.id);
+  }
   async featuredPosts(session: UserSession) {
     await this.currentUser(session);
     const member = await this.memberships.findOneBy({ userId: session.id, verificationStatus: 'verified' });
@@ -454,12 +491,12 @@ export class AppService implements OnModuleInit {
     const parentId = typeof data.parentId === 'string' ? data.parentId.trim() : null;
     const clientRequestHash = createHash('sha256').update(clientRequestId).digest('hex');
     const submissionHash = createHash('sha256').update(JSON.stringify({ content, parentId })).digest('hex');
-    return this.eventTransaction(async (manager) => {
+    const outcome = await this.eventTransaction(async (manager) => {
       const post = await this.commentPost(manager, session, postId, true);
       const existing = await manager.findOneBy(PostComment, { authorId: session.id, postId, clientRequestHash });
       if (existing) {
         if (existing.submissionHash !== submissionHash) throw new ConflictException('评论内容已变化，请重新提交');
-        return (await this.decorateComments(manager, [existing], post, session.id))[0];
+        return { result: (await this.decorateComments(manager, [existing], post, session.id))[0], created: false };
       }
       if (parentId) {
         const parent = await manager.findOneBy(PostComment, { id: parentId, postId });
@@ -467,8 +504,13 @@ export class AppService implements OnModuleInit {
         if (parent.deleted) throw new ConflictException('该评论已删除，请刷新后重试');
       }
       const comment = await manager.save(PostComment, manager.create(PostComment, { authorId: session.id, postId, content, parentId, clientRequestId, clientRequestHash, submissionHash }));
-      return (await this.decorateComments(manager, [comment], post, session.id))[0];
+      return { result: (await this.decorateComments(manager, [comment], post, session.id))[0], created: true };
     });
+    if (outcome.created) {
+      const post = await this.posts.findOneBy({ id: postId });
+      await this.recordEvent({ eventCode: 'comment_created', userId: session.id, schoolId: post?.schoolId || null, targetType: 'post', targetId: postId, properties: { postType: post?.type || '', isReply: Boolean(parentId) } });
+    }
+    return outcome.result;
   }
   async deleteComment(session: UserSession, postId: string, commentId: string) {
     return this.eventTransaction(async (manager) => {
@@ -580,6 +622,7 @@ export class AppService implements OnModuleInit {
         if (eventData) await manager.save(Event, manager.create(Event, { postId: created.id, ...eventData }));
         return created;
       });
+      await this.recordEvent({ eventCode: 'post_published', userId: session.id, schoolId: post.schoolId, targetType: 'post', targetId: post.id, properties: { postType: post.type, circle: post.circle, status: post.status } });
       return resultFor(post);
     } catch (error) {
       // The unique index resolves concurrent retries, including across API instances.
@@ -623,11 +666,13 @@ export class AppService implements OnModuleInit {
   }
   async registerEvent(session: UserSession, eventId: string) {
     await this.currentUser(session);
-    return this.eventTransaction(async (manager) => {
+    let newlyRegistered = false;
+    const result = await this.eventTransaction(async (manager) => {
       const event = await this.eventForRegistration(manager, eventId, session.id);
       let registration = await manager.findOneBy(EventRegistration, { eventId, userId: session.id });
       const alreadyRegistered = registration?.status === 'registered';
       if (!alreadyRegistered) {
+        newlyRegistered = true;
         const now = new Date();
         if (event.status !== 'active' || event.registrationDeadline <= now || event.startsAt <= now) throw new ConflictException('活动当前不可报名');
         const reserved = await manager.createQueryBuilder().update(Event)
@@ -646,14 +691,21 @@ export class AppService implements OnModuleInit {
       const latest = await manager.findOneByOrFail(Event, { id: eventId });
       return { registered: true, registeredCount: latest.registeredCount, capacity: latest.capacity, eventId, postId: event.postId, ...(alreadyRegistered ? { message: '已报名' } : {}) };
     });
+    if (newlyRegistered) {
+      const post = await this.posts.findOneBy({ id: result.postId });
+      await this.recordEvent({ eventCode: 'event_registered', userId: session.id, schoolId: post?.schoolId || null, targetType: 'event', targetId: eventId, properties: {} });
+    }
+    return result;
   }
   async cancelEvent(session: UserSession, eventId: string) {
     await this.currentUser(session);
-    return this.eventTransaction(async (manager) => {
+    let cancelled = false;
+    const result = await this.eventTransaction(async (manager) => {
       const event = await this.eventForRegistration(manager, eventId, session.id);
       const registration = await manager.findOneBy(EventRegistration, { eventId, userId: session.id });
       if (!registration) throw new NotFoundException('未找到报名记录');
       if (registration.status === 'registered') {
+        cancelled = true;
         registration.status = 'cancelled';
         await manager.save(EventRegistration, registration);
         await manager.createQueryBuilder().update(Event)
@@ -664,6 +716,11 @@ export class AppService implements OnModuleInit {
       const latest = await manager.findOneByOrFail(Event, { id: eventId });
       return { registered: false, registeredCount: latest.registeredCount, capacity: latest.capacity, eventId, postId: event.postId };
     });
+    if (cancelled) {
+      const post = await this.posts.findOneBy({ id: result.postId });
+      await this.recordEvent({ eventCode: 'event_cancelled', userId: session.id, schoolId: post?.schoolId || null, targetType: 'event', targetId: eventId, properties: {} });
+    }
+    return result;
   }
 
   async listRoutes(session: UserSession, data?: { destination?: string; days?: string; preferences?: string[] }) { await this.currentUser(session); const member = await this.memberships.findOneBy({ userId: session.id, verificationStatus: 'verified' }); const routes = await this.routes.findBy({ status: 'active' }); const filtered = routes.filter((r) => (r.visibility === 'platform' || r.schoolId === member?.schoolId) && (!data?.destination || r.destination.includes(data.destination)) && (!data?.days || r.days === data.days) && (!data?.preferences?.length || data.preferences.some((p) => r.preferences.includes(p)))); return Promise.all(filtered.map((r) => this.decorateRoute(r, session.id))); }
@@ -893,7 +950,52 @@ export class AppService implements OnModuleInit {
       await manager.save(Post, post);
       await manager.save(AuditLog, manager.create(AuditLog, { adminId: admin.id, schoolId: admin.schoolId || null, action: `post.${status}`, resourceType: 'post', resourceId: post.id, detail: reason }));
     });
+    const created = new Date(post.createdAt).getTime();
+    const latencySeconds = Number.isFinite(created) ? Math.max(0, Math.round((Date.now() - created) / 1000)) : 0;
+    await this.recordEvent({ eventCode: 'post_reviewed', userId: admin.id, schoolId: post.schoolId, targetType: 'post', targetId: post.id, properties: { status, latencyBucket: this.latencyBucket(latencySeconds) } });
     return this.decorateAdminPost(post);
+  }
+  async adminAnalytics(session: AdminSession, query: Record<string, unknown> = {}) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator');
+    if (Object.entries(query).some(([key, value]) => !['from', 'to', 'schoolId'].includes(key) || (value !== undefined && typeof value !== 'string'))) throw new BadRequestException('统计参数无效');
+    const from = this.analyticsDate(query.from, this.beijingDateOffset(-6));
+    const to = this.analyticsDate(query.to, this.beijingDateOffset(0));
+    if (from > to) throw new BadRequestException('开始日期不能晚于结束日期');
+    const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+    if (!Number.isFinite(days) || days > 31) throw new BadRequestException('统计范围最多31天');
+    let schoolId: string | null = null;
+    if (admin.role === 'operator') {
+      if (!admin.schoolId) throw new ForbiddenException('无学校范围');
+      if (query.schoolId && query.schoolId !== admin.schoolId) throw new ForbiddenException('无权查看其他学校统计');
+      schoolId = admin.schoolId;
+    } else if (typeof query.schoolId === 'string' && query.schoolId) {
+      schoolId = query.schoolId;
+    }
+    const fromDate = new Date(`${from}T00:00:00+08:00`);
+    const untilDate = new Date(new Date(`${to}T00:00:00+08:00`).getTime() + 86400000);
+    const qb = this.analytics.createQueryBuilder('event').where('event.createdAt >= :from AND event.createdAt < :until', { from: fromDate, until: untilDate });
+    if (schoolId) qb.andWhere('event.schoolId = :schoolId', { schoolId });
+    const events = await qb.orderBy('event.createdAt', 'ASC').take(20000).getMany();
+    const daily = new Map<string, { date: string; eventCode: string; count: number; actors: Set<string> }>();
+    const totals = new Map<string, { count: number; actors: Set<string> }>();
+    for (const event of events) {
+      const date = this.beijingDateKey(event.createdAt);
+      const dailyKey = `${date}:${event.eventCode}`;
+      const day = daily.get(dailyKey) || { date, eventCode: event.eventCode, count: 0, actors: new Set<string>() };
+      day.count += 1;
+      if (event.actorHash) day.actors.add(event.actorHash);
+      daily.set(dailyKey, day);
+      const total = totals.get(event.eventCode) || { count: 0, actors: new Set<string>() };
+      total.count += 1;
+      if (event.actorHash) total.actors.add(event.actorHash);
+      totals.set(event.eventCode, total);
+    }
+    const items = [...daily.values()].map(({ date, eventCode, count, actors }) => ({ date, eventCode, count, uniqueActors: actors.size }))
+      .sort((a, b) => a.date === b.date ? a.eventCode.localeCompare(b.eventCode) : a.date.localeCompare(b.date));
+    const totalItems = [...totals.entries()].map(([eventCode, value]) => ({ eventCode, count: value.count, uniqueActors: value.actors.size }))
+      .sort((a, b) => a.eventCode.localeCompare(b.eventCode));
+    return { from, to, schoolId, items, totals: totalItems, truncated: events.length >= 20000 };
   }
   async adminReports(session: AdminSession, query: Record<string, unknown> = {}) {
     const admin = await this.activeAdmin(session);
