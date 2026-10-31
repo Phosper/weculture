@@ -7,8 +7,9 @@ import { PostSubmissionIdentity1790899200000 } from './migrations/1790899200000-
 import { PostCircles1791417600000 } from './migrations/1791417600000-PostCircles';
 import { RoutePlanDetails1792454400000 } from './migrations/1792454400000-RoutePlanDetails';
 import { PostComments1792458000000 } from './migrations/1792458000000-PostComments';
+import { ContentReports1793000000000 } from './migrations/1793000000000-ContentReports';
 
-const MIGRATIONS = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000];
+const MIGRATIONS = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000, ContentReports1793000000000];
 
 export function createDatabaseOptions(): TypeOrmModuleOptions {
   if (isTest()) {

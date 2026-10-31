@@ -93,6 +93,15 @@
 - 服务端使用[腾讯官方逆地址解析接口](https://github.com/TencentLBS/tencentmap-webservice-skill/blob/main/references/api-geocoder.md)，只请求 `get_poi=0`，上游最长等待 5 秒。未配置 Key 返回 `HTTP_503` 和“自动定位尚未配置，请手动选择城市”；上游超时、拒绝或无法识别城市同样返回中文手选提示，不把上游错误、坐标或密钥传给客户端。当前不通过 IP 推断城市，不自动修改投稿归属，用户仍可手动切换城市。
 - `test/city-location.e2e-spec.ts` 使用模拟上游响应测试鉴权、坐标校验、签名、城市规范化、数据最小化及超时，不访问真实地图服务。后续已配置真实 Key、部署 API020，并单独通过三城云端解析；该结果与自动测试分开记录。微信定位权限、客户端上传及真机定位验收仍待完成，详见[自动定位配置说明](../Weculture自动定位配置说明.md)。
 
+## 举报治理：2026-11-01 本地实现，待配套发布
+
+- `POST /api/v1/reports`（用户登录）：`{ targetType: "post"|"comment", targetId, reason, detail? }`。原因编码为 `spam/harassment/false_info/inappropriate/privacy/other`，`other` 必须填写说明；`detail` 最多500字，不允许控制字符。对象必须对当前用户可见，评论未删除，不能举报自己的内容。同一用户同一对象只保留一条举报；待处理重复提交返回原记录和 `duplicate:true`，已处理返回409。响应只含 `{id,status,duplicate,createdAt}`，不返回被举报内容。
+- `GET /api/v1/admin/reports?status=&targetType=&page=&pageSize=`（管理员）：`super_admin` 查看全部；`operator`／`reviewer` 只查看本校 `schoolId`，无学校范围拒绝。平台内容举报（`schoolId=null`）只有 `super_admin` 可见。列表返回举报人、学校、对象标题／摘要、对象状态和是否仍可读取；已删除评论的摘要为空。
+- `POST /api/v1/admin/reports/:id/resolve`（管理员，HTTP 200）：`{ action: "dismiss"|"takedown", reason }`，说明1–500字。驳回只关闭当前举报；下架内容置 `posts.status=offline`，删除评论置 `post_comments.deleted=true` 且清空正文，并关闭同一对象所有待处理举报。每次处理写 `audit_logs` 的 `report.dismiss`／`report.takedown`。已处理409，跨校或平台举报越权403。
+- `GET /api/v1/admin/dashboard` 增加 `pendingReports`，按管理员学校范围计数。
+- 新表 `content_reports`，迁移 `1793000000000-ContentReports`；唯一索引防止同一用户重复举报同一对象。生产仍 `synchronize=false`，须先备份再迁移。
+- 本地检查：`test/reports.e2e-spec.ts`（权限、重复、跨校、驳回、下架、评论清空、工作台计数）、`test/content-reports-migration.e2e-spec.ts`（可逆、唯一索引、MySQL SQL）；小程序 `test/reports.test.js`（7项）。全部为本地模拟，未部署、未访问真实 MySQL。
+
 ## 迁移与旧数据
 
 迁移 `1791417600000-PostCircles` 新增三个可空字段和圈层分页索引；只将旧 `visibility=school` 分类为 `campus`，保留学校、审核状态、原因、作者与投稿请求标识。

@@ -22,7 +22,8 @@ function formatComment(item) {
   return { ...item, content: item.deleted ? '' : item.content, createdAtText: formatDateTime(item.createdAt),
     author: { ...author, nickname: author.nickname || '文化同好', initial: (author.nickname || '文').slice(0, 1) },
     parent: item.parent ? { ...item.parent, nickname: item.parent.nickname || '文化同好' } : null,
-    canDelete: !item.deleted && !!item.canDelete, canReply: !item.deleted && !!item.canReply };
+    canDelete: !item.deleted && !!item.canDelete, canReply: !item.deleted && !!item.canReply,
+    canReport: !item.deleted && !!item.canReport };
 }
 
 function readCommentPage(result, postId, page) {

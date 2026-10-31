@@ -8,11 +8,13 @@ const { contentShare } = require('../../utils/share');
 const { topicPath } = require('../../utils/topics');
 const { authorProfilePath } = require('../../utils/authors');
 const { COMMENT_PAGE_SIZE, commentDraft, prepareCommentRequest, readCommentPage, mergeComments, confirmCommentDeletion } = require('../../utils/comments');
+const { REPORT_REASONS, reportDraft, reportPayload, formatReportResult } = require('../../utils/reports');
 
 Page(withTypography({
   data: { post: null, error: '', loading: true, eventBusy: false, eventError: '', canShare: false, canVerify: false,
     comments: [], commentsReady: false, commentsLoading: false, commentsMoreLoading: false, commentsError: '', commentsPage: 0, commentsHasMore: false,
-    commentCount: 0, commentContent: '', commentLength: 0, commentReply: null, commentBusy: false, commentError: '', commentDeleteBusyId: '' },
+    commentCount: 0, commentContent: '', commentLength: 0, commentReply: null, commentBusy: false, commentError: '', commentDeleteBusyId: '',
+    reportReasons: REPORT_REASONS, reportOpen: false, reportTarget: null, reportReason: '', reportDetail: '', reportLength: 0, reportBusy: false, reportError: '' },
   onLoad(options) { this.postId = detailPath(options.id) ? options.id : ''; this.updateShareMenu(false); },
   async onShow() {
     this._visible = true;
@@ -21,6 +23,7 @@ Page(withTypography({
     this._shareUserId = null;
     this.syncCommentUser();
     this.resetComments();
+    this.resetReport();
     this.setData({ eventBusy: !!this._eventOperation, post: null, canVerify: false, loading: true, error: '', eventError: '' });
     this.updateShareMenu(false);
     const user = await requireLogin(this);
@@ -28,7 +31,7 @@ Page(withTypography({
     if (user) { this.syncCommentUser(); this._shareUserId = user.id; this._unverified = !user.verified; return this.load(); }
     this.setData({ loading: false });
   },
-  onHide() { this._visible = false; this._viewVersion = (this._viewVersion || 0) + 1; this._loadVersion = (this._loadVersion || 0) + 1; this.resetComments(); this.updateShareMenu(false); },
+  onHide() { this._visible = false; this._viewVersion = (this._viewVersion || 0) + 1; this._loadVersion = (this._loadVersion || 0) + 1; this.resetComments(); this.resetReport(); this.updateShareMenu(false); },
   onUnload() { this.onHide(); this.resetComments(true); },
   async load() {
     const version = this._loadVersion = (this._loadVersion || 0) + 1;
@@ -66,6 +69,7 @@ Page(withTypography({
       this._commentOperation = null;
       this._commentDeleteOperation = null;
       this.resetComments(true);
+      this.resetReport();
     }
   },
   resetComments(discardDraft = false) {
@@ -151,6 +155,63 @@ Page(withTypography({
     });
   },
   cancelReply() { if (!this.commentContext() || this._commentOperation) return; this.setData({ commentReply: null, commentError: '' }); },
+  resetReport() {
+    this._reportOperation = null;
+    this.setData({ reportOpen: false, reportTarget: null, reportReason: '', reportDetail: '', reportLength: 0, reportBusy: false, reportError: '' });
+  },
+  openPostReport() {
+    const post = this.data.post;
+    if (!post || !post.canReport) return;
+    this.openReport({ type: 'post', id: post.id, label: post.title || '这条内容' });
+  },
+  openCommentReport(event) {
+    const item = this.data.comments.find(value => value.id === event.currentTarget.dataset.id);
+    if (!item || !item.canReport) return;
+    this.openReport({ type: 'comment', id: item.id, label: `评论：${item.author.nickname}` });
+  },
+  openReport(target) {
+    if (!this.commentContext() || this._reportOperation) return;
+    this.setData({ reportOpen: true, reportTarget: target, reportReason: '', reportDetail: '', reportLength: 0, reportError: '' });
+  },
+  closeReport() {
+    if (this._reportOperation) return;
+    this.setData({ reportOpen: false, reportTarget: null, reportReason: '', reportDetail: '', reportLength: 0, reportError: '' });
+  },
+  noop() {},
+  chooseReportReason(event) {
+    if (this._reportOperation) return;
+    const code = event.currentTarget.dataset.code;
+    if (REPORT_REASONS.some(item => item.code === code)) this.setData({ reportReason: code, reportError: '' });
+  },
+  reportDetailInput(event) {
+    if (this._reportOperation) return;
+    const value = event.detail && typeof event.detail.value === 'string' ? event.detail.value : '';
+    this.setData({ reportDetail: value, reportLength: value.length, reportError: '' });
+  },
+  async submitReport() {
+    const context = this.commentContext();
+    const target = this.data.reportTarget;
+    if (!context || !target || this._reportOperation) return;
+    let payload;
+    try { payload = reportPayload(target.type, target.id, reportDraft(this.data.reportReason, this.data.reportDetail)); }
+    catch (error) { this.setData({ reportError: error.message }); return; }
+    const operation = { context, targetType: target.type, targetId: target.id };
+    this._reportOperation = operation;
+    this.setData({ reportBusy: true, reportError: '' });
+    try {
+      const result = formatReportResult(await api.post('/reports', payload));
+      if (!this.commentContextCurrent(context) || this._reportOperation !== operation) return;
+      this.setData({ reportOpen: false, reportTarget: null, reportReason: '', reportDetail: '', reportLength: 0 });
+      wx.showToast({ title: result.duplicate ? '已提交过，正在处理' : '举报已提交', icon: 'none' });
+    } catch (error) {
+      if (this._reportOperation === operation) this.setData({ reportError: error.message || '举报提交失败，请检查网络后重试' });
+    } finally {
+      if (this._reportOperation === operation) {
+        this._reportOperation = null;
+        this.setData({ reportBusy: false });
+      }
+    }
+  },
   async submitComment() {
     const context = this.commentContext();
     if (!context || this._commentOperation) return;

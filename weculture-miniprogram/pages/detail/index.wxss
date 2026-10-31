@@ -58,3 +58,19 @@
 .comment-load-error button { margin-top: 18rpx; font-size: calc(24rpx * var(--font-scale, 1)); }
 .comment-more { margin-top: 24rpx; font-size: calc(24rpx * var(--font-scale, 1)); }
 .comments-end { padding-top: 28rpx; text-align: center; color: #9A9693; font-size: calc(21rpx * var(--font-scale, 1)); }
+.report-entry { color: #79747E; }
+.report-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; z-index: 60; display: flex; align-items: flex-end; background: rgba(28, 27, 31, 0.45); }
+.report-sheet { width: 100%; max-height: 82vh; overflow-y: auto; box-sizing: border-box; padding: 28rpx 28rpx calc(28rpx + env(safe-area-inset-bottom)); border-radius: 28rpx 28rpx 0 0; }
+.report-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20rpx; }
+.report-heading-copy { flex: 1; min-width: 0; }
+.report-title { font-size: calc(31rpx * var(--font-scale, 1)); font-weight: 700; }
+.report-target { margin-top: 8rpx; color: #79747E; font-size: calc(22rpx * var(--font-scale, 1)); line-height: 1.6; word-break: break-all; }
+.report-reason-list { display: flex; flex-wrap: wrap; gap: 14rpx; margin-top: 22rpx; }
+.report-reason { margin: 0; padding: 12rpx 22rpx; border: 1rpx solid #E7E5E2; border-radius: 999rpx; background: #FFFFFF; color: #1C1B1F; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.5; }
+.report-reason::after { border: none; }
+.report-reason-active { border-color: #C5532E; background: #FDE8DD; color: #C5532E; }
+.report-textarea { display: block; width: 100%; min-height: 120rpx; margin-top: 22rpx; box-sizing: border-box; font-size: calc(25rpx * var(--font-scale, 1)); line-height: 1.7; color: #1C1B1F; }
+.report-footer { display: flex; align-items: center; justify-content: space-between; gap: 20rpx; margin-top: 18rpx; }
+.report-submit { margin: 0; padding: 0 28rpx; font-size: calc(24rpx * var(--font-scale, 1)); line-height: 2.5; }
+.report-error { margin-top: 14rpx; color: #9A362B; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.6; word-break: break-all; }
+.report-note { margin-top: 14rpx; color: #9A9693; font-size: calc(21rpx * var(--font-scale, 1)); line-height: 1.6; }

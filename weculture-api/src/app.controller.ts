@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Headers, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AppService } from './app.service';
 import { AdminGuard, UserGuard } from './auth';
 
@@ -46,6 +46,8 @@ export class AppController {
   @UseGuards(UserGuard)
   @Delete('posts/:id/comments/:commentId') deleteComment(@Req() req: { user: any }, @Param('id') id: string, @Param('commentId') commentId: string) { return this.service.deleteComment(req.user, id, commentId); }
   @UseGuards(UserGuard)
+  @Post('reports') createReport(@Req() req: { user: any }, @Body() body: unknown) { return this.service.createReport(req.user, body); }
+  @UseGuards(UserGuard)
   @Post('posts/:id/likes') like(@Req() req: { user: any }, @Param('id') id: string) { return this.service.toggleLike(req.user, id); }
   @UseGuards(UserGuard)
   @Post('posts/:id/favorite') favorite(@Req() req: { user: any }, @Param('id') id: string) { return this.service.toggleFavorite(req.user, 'post', id); }
@@ -88,6 +90,12 @@ export class AppController {
   @Patch('admin/posts/:id') editAdminPost(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: Record<string, unknown>) { return this.service.saveAdminPost(req.admin, body, id); }
   @UseGuards(AdminGuard)
   @Post('admin/posts/:id/review') reviewPost(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: { status: 'approved' | 'rejected' | 'offline'; reason?: string }) { return this.service.reviewPost(req.admin, id, body.status, body.reason); }
+  @UseGuards(AdminGuard)
+  @Get('admin/reports') adminReports(@Req() req: { admin: any }, @Query() query: Record<string, unknown>) { return this.service.adminReports(req.admin, query); }
+  @UseGuards(AdminGuard)
+  @Post('admin/reports/:id/resolve')
+  @HttpCode(200)
+  resolveReport(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: unknown) { return this.service.resolveReport(req.admin, id, body); }
   @UseGuards(AdminGuard)
   @Get('admin/invites') invites(@Req() req: { admin: any }) { return this.service.adminInvites(req.admin); }
   @UseGuards(AdminGuard)

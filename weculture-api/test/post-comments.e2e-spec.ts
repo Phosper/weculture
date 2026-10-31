@@ -44,10 +44,10 @@ describe('Post comments and replies', () => {
     const post = await fixture(), payload = body('  第一次文化交流\n很期待  ');
     const created = (await add(unverified.token, post.id, payload).expect(201)).body.data;
     expect(created).toEqual({ id: expect.any(String), postId: post.id, content: '第一次文化交流\n很期待', createdAt: expect.any(String), deleted: false,
-      author: { id: unverified.id, nickname: '未认证同学', avatarUrl: 'https://example.com/未认证.png', profileAvailable: true }, isPostAuthor: false, canDelete: true, canReply: true, parent: null });
+      author: { id: unverified.id, nickname: '未认证同学', avatarUrl: 'https://example.com/未认证.png', profileAvailable: true }, isPostAuthor: false, canDelete: true, canReply: true, canReport: false, parent: null });
     const listed = (await get(author.token, post.id).expect(200)).body.data;
     expect(listed).toMatchObject({ page: 1, pageSize: 20, total: 1, activeCount: 1, hasMore: false });
-    expect(listed.items).toEqual([{ ...created, canDelete: false }]);
+    expect(listed.items).toEqual([{ ...created, canDelete: false, canReport: true }]);
     expect(JSON.stringify(listed)).not.toContain('clientRequest'); expect(JSON.stringify(listed)).not.toContain('submissionHash');
   });
 

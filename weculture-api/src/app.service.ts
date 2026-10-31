@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'node:crypto';
 import { DataSource, EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
-import { AdminAccount, AssistantKnowledge, AssistantMessage, AuditLog, Event, EventRegistration, Favorite, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
+import { AdminAccount, AssistantKnowledge, AssistantMessage, AuditLog, ContentReport, Event, EventRegistration, Favorite, InviteCode, Like, Post, PostComment, School, SchoolMembership, TravelRoute, User, UserPlan } from './entities';
 import { adminAuthVersion, createToken, Session } from './auth';
 import { AdminLoginLimiter, DEMO_ADMIN_PASSWORD, validNewAdminPassword } from './admin-security';
 import { previewStoredImage } from './admin-media';
@@ -18,6 +18,9 @@ type RoutePlanInput = { planned: boolean; departDate?: string; companions?: numb
 const POST_CIRCLES = ['city', 'international', 'campus'] as const;
 const POST_QUERY_KEYS = ['scope', 'circle', 'city', 'schoolId', 'type', 'q', 'tag', 'eventTime', 'status', 'page', 'pageSize'];
 const CONTENT_LANGUAGES = ['zh', 'en', 'ru', 'fr', 'es', 'ar', 'other'];
+const REPORT_REASONS = ['spam', 'harassment', 'false_info', 'inappropriate', 'privacy', 'other'] as const;
+const REPORT_STATUSES = ['pending', 'dismissed', 'removed'] as const;
+type ReportQuery = { status?: string; targetType?: string; page?: string; pageSize?: string };
 
 @Injectable()
 export class AppService implements OnModuleInit {
@@ -29,6 +32,8 @@ export class AppService implements OnModuleInit {
     @InjectRepository(SchoolMembership) private memberships: Repository<SchoolMembership>,
     @InjectRepository(InviteCode) private invites: Repository<InviteCode>,
     @InjectRepository(Post) private posts: Repository<Post>,
+    @InjectRepository(PostComment) private comments: Repository<PostComment>,
+    @InjectRepository(ContentReport) private reports: Repository<ContentReport>,
     @InjectRepository(Event) private events: Repository<Event>,
     @InjectRepository(EventRegistration) private registrations: Repository<EventRegistration>,
     @InjectRepository(Like) private likes: Repository<Like>,
@@ -393,6 +398,7 @@ export class AppService implements OnModuleInit {
         createdAt: comment.createdAt, deleted: comment.deleted, author: authorFor(comment.authorId),
         isPostAuthor: comment.authorId === post.authorId,
         canDelete: !comment.deleted && comment.authorId === userId, canReply: !comment.deleted,
+        canReport: !comment.deleted && comment.authorId !== userId,
         parent: parent ? { id: parent.id, nickname: authorFor(parent.authorId).nickname, deleted: parent.deleted } : null,
       };
     });
@@ -451,11 +457,62 @@ export class AppService implements OnModuleInit {
       return { deleted: true, id: comment.id };
     });
   }
+  async createReport(session: UserSession, body: unknown) {
+    await this.currentUser(session);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('举报参数无效');
+    const data = body as Record<string, unknown>;
+    if (Object.keys(data).some((key) => !['targetType', 'targetId', 'reason', 'detail'].includes(key))) throw new BadRequestException('举报参数无效');
+    const targetType = data.targetType;
+    if (targetType !== 'post' && targetType !== 'comment') throw new BadRequestException('举报对象类型无效');
+    const targetId = typeof data.targetId === 'string' ? data.targetId.trim() : '';
+    if (!targetId || targetId.length > 80 || /[\u0000-\u001f\u007f]/.test(targetId)) throw new BadRequestException('举报对象无效');
+    const reason = data.reason;
+    if (typeof reason !== 'string' || !REPORT_REASONS.includes(reason as typeof REPORT_REASONS[number])) throw new BadRequestException('请选择有效的举报原因');
+    const detail = typeof data.detail === 'string' ? data.detail.trim() : '';
+    if (detail.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(detail)) throw new BadRequestException('补充说明应为0至500字');
+    if (reason === 'other' && !detail) throw new BadRequestException('选择“其他”时请补充说明');
+    let post: Post;
+    let authorId: string;
+    if (targetType === 'post') {
+      post = await this.visiblePost(targetId, session.id);
+      authorId = post.authorId;
+    } else {
+      const comment = await this.comments.findOneBy({ id: targetId });
+      if (!comment) throw new NotFoundException('评论不存在或不可见');
+      post = await this.visiblePost(comment.postId, session.id);
+      if (comment.deleted) throw new ConflictException('评论已删除');
+      authorId = comment.authorId;
+    }
+    if (authorId === session.id) throw new BadRequestException('不能举报自己的内容');
+    const existing = await this.reports.findOneBy({ reporterId: session.id, targetType, targetId });
+    if (existing) {
+      if (existing.status !== 'pending') throw new ConflictException('该举报已处理，不能重复提交');
+      return this.reportReceipt(existing, true);
+    }
+    try {
+      const report = await this.reports.save(this.reports.create({
+        reporterId: session.id, schoolId: post.schoolId || null, targetType, targetId,
+        postId: post.id, reason, detail, status: 'pending', handledBy: null, handledAt: null, resolution: '',
+      }));
+      return this.reportReceipt(report, false);
+    } catch (error) {
+      // The unique index arbitrates concurrent duplicate submissions.
+      const raced = await this.reports.findOneBy({ reporterId: session.id, targetType, targetId });
+      if (raced) {
+        if (raced.status !== 'pending') throw new ConflictException('该举报已处理，不能重复提交');
+        return this.reportReceipt(raced, true);
+      }
+      throw error;
+    }
+  }
+  private reportReceipt(report: ContentReport, duplicate: boolean) {
+    return { id: report.id, status: report.status, duplicate, createdAt: report.createdAt };
+  }
   private async decoratePost(post: Post, userId: string) {
     const [author, liked, favorited, event] = await Promise.all([this.users.findOneBy({ id: post.authorId }), this.likes.existsBy({ userId, postId: post.id }), this.favorites.existsBy({ userId, targetType: 'post', targetId: post.id }), post.type === 'event' ? this.events.findOneBy({ postId: post.id }) : Promise.resolve(null)]);
     const registration = event ? await this.registrations.findOneBy({ eventId: event.id, userId, status: 'registered' }) : null;
     const { clientRequestId, submissionHash, ...publicPost } = post;
-    return { ...publicPost, author: author ? { id: author.id, nickname: author.nickname || 'Weculture 用户', avatarUrl: author.avatarUrl, profileAvailable: author.status === 'active' } : { id: post.authorId, nickname: 'Weculture', avatarUrl: '', profileAvailable: false }, liked, favorited, event: event ? { ...event, registered: Boolean(registration) } : null };
+    return { ...publicPost, author: author ? { id: author.id, nickname: author.nickname || 'Weculture 用户', avatarUrl: author.avatarUrl, profileAvailable: author.status === 'active' } : { id: post.authorId, nickname: 'Weculture', avatarUrl: '', profileAvailable: false }, liked, favorited, canReport: post.status === 'approved' && post.authorId !== userId, event: event ? { ...event, registered: Boolean(registration) } : null };
   }
 
   async createPost(session: UserSession, data: Record<string, unknown>) {
@@ -726,7 +783,8 @@ export class AppService implements OnModuleInit {
     const admin = await this.activeAdmin(session);
     const qb = this.adminPostQuery(admin);
     const activeEvents = qb.clone().innerJoin(Event, 'event', 'event.postId = post.id').andWhere('event.status = :active', { active: 'active' }).andWhere('post.status = :approved', { approved: 'approved' }).getCount();
-    return { pendingPosts: await qb.clone().andWhere('post.status = :pending', { pending: 'pending' }).getCount(), approvedPosts: await qb.clone().andWhere('post.status = :approved', { approved: 'approved' }).getCount(), users: admin.role === 'super_admin' ? await this.users.count() : await this.memberships.countBy({ schoolId: admin.schoolId!, verificationStatus: 'verified' }), activeEvents: await activeEvents, recentAudits: await this.audits.find({ where: admin.role === 'super_admin' ? {} : { schoolId: admin.schoolId! }, order: { createdAt: 'DESC' }, take: 10 }) };
+    const pendingReports = await this.reports.countBy(admin.role === 'super_admin' ? { status: 'pending' } : { status: 'pending', schoolId: admin.schoolId! });
+    return { pendingPosts: await qb.clone().andWhere('post.status = :pending', { pending: 'pending' }).getCount(), approvedPosts: await qb.clone().andWhere('post.status = :approved', { approved: 'approved' }).getCount(), users: admin.role === 'super_admin' ? await this.users.count() : await this.memberships.countBy({ schoolId: admin.schoolId!, verificationStatus: 'verified' }), activeEvents: await activeEvents, pendingReports, recentAudits: await this.audits.find({ where: admin.role === 'super_admin' ? {} : { schoolId: admin.schoolId! }, order: { createdAt: 'DESC' }, take: 10 }) };
   }
   async adminSchools(session: AdminSession) {
     const admin = await this.activeAdmin(session);
@@ -813,6 +871,113 @@ export class AppService implements OnModuleInit {
       await manager.save(AuditLog, manager.create(AuditLog, { adminId: admin.id, schoolId: admin.schoolId || null, action: `post.${status}`, resourceType: 'post', resourceId: post.id, detail: reason }));
     });
     return this.decorateAdminPost(post);
+  }
+  async adminReports(session: AdminSession, query: Record<string, unknown> = {}) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator', 'reviewer');
+    if (Object.entries(query).some(([key, value]) => !['status', 'targetType', 'page', 'pageSize'].includes(key) || (value !== undefined && typeof value !== 'string'))) throw new BadRequestException('筛选参数无效');
+    const status = query.status;
+    if (status !== undefined && !REPORT_STATUSES.includes(status as typeof REPORT_STATUSES[number])) throw new BadRequestException('举报状态无效');
+    const targetType = query.targetType;
+    if (targetType !== undefined && targetType !== 'post' && targetType !== 'comment') throw new BadRequestException('举报对象类型无效');
+    const { page, pageSize } = this.reportPagination(query);
+    const qb = this.reports.createQueryBuilder('report');
+    if (admin.role === 'super_admin') qb.where('1 = 1');
+    else {
+      if (!admin.schoolId) throw new ForbiddenException('无学校范围');
+      qb.where('report.schoolId = :schoolId', { schoolId: admin.schoolId });
+    }
+    if (status) qb.andWhere('report.status = :status', { status });
+    if (targetType) qb.andWhere('report.targetType = :targetType', { targetType });
+    const [rows, total] = await qb.orderBy('report.createdAt', 'DESC').addOrderBy('report.id', 'DESC').skip((page - 1) * pageSize).take(pageSize).getManyAndCount();
+    return { items: await this.decorateReports(rows), page, pageSize, total, hasMore: page * pageSize < total };
+  }
+  private reportPagination(query: Record<string, unknown>) {
+    const parse = (value: unknown, fallback: number, maximum: number) => {
+      if (value === undefined) return fallback;
+      if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value) || Number(value) > maximum) throw new BadRequestException('分页参数无效');
+      return Number(value);
+    };
+    return { page: parse(query.page, 1, 100000), pageSize: parse(query.pageSize, 20, 100) };
+  }
+  private async decorateReports(rows: ContentReport[]) {
+    if (!rows.length) return [];
+    const postIds = [...new Set(rows.map((row) => row.postId))];
+    const commentIds = [...new Set(rows.filter((row) => row.targetType === 'comment').map((row) => row.targetId))];
+    const schoolIds = [...new Set(rows.map((row) => row.schoolId).filter((id): id is string => Boolean(id)))];
+    const [posts, comments, schools] = await Promise.all([
+      this.posts.findBy({ id: In(postIds) }),
+      commentIds.length ? this.comments.findBy({ id: In(commentIds) }) : Promise.resolve([] as PostComment[]),
+      schoolIds.length ? this.schools.findBy({ id: In(schoolIds) }) : Promise.resolve([] as School[]),
+    ]);
+    const authorIds = [...new Set([...posts.map((post) => post.authorId), ...comments.map((comment) => comment.authorId)])];
+    const userIds = [...new Set([...rows.map((row) => row.reporterId), ...authorIds])];
+    const users = userIds.length ? await this.users.findBy({ id: In(userIds) }) : [];
+    const postMap = new Map(posts.map((post) => [post.id, post]));
+    const commentMap = new Map(comments.map((comment) => [comment.id, comment]));
+    const userMap = new Map(users.map((user) => [user.id, user]));
+    const schoolMap = new Map(schools.map((school) => [school.id, school]));
+    return rows.map((report) => {
+      const post = postMap.get(report.postId);
+      const comment = report.targetType === 'comment' ? commentMap.get(report.targetId) : undefined;
+      const authorId = report.targetType === 'post' ? post?.authorId : comment?.authorId;
+      const reporter = userMap.get(report.reporterId);
+      const author = authorId ? userMap.get(authorId) : undefined;
+      const school = report.schoolId ? schoolMap.get(report.schoolId) : undefined;
+      return {
+        id: report.id, targetType: report.targetType, targetId: report.targetId, postId: report.postId,
+        reason: report.reason, detail: report.detail, status: report.status,
+        createdAt: report.createdAt, updatedAt: report.updatedAt, handledAt: report.handledAt, handledBy: report.handledBy, resolution: report.resolution,
+        reporter: { id: report.reporterId, nickname: reporter?.nickname || 'Weculture 用户' },
+        school: school ? { id: school.id, name: school.name, shortName: school.shortName } : null,
+        target: {
+          postTitle: post?.title || '', postStatus: post?.status || null,
+          authorNickname: author?.nickname || 'Weculture 用户',
+          commentExcerpt: comment && !comment.deleted ? comment.content.slice(0, 120) : '',
+          commentDeleted: report.targetType === 'comment' ? (comment ? comment.deleted : true) : null,
+          available: report.targetType === 'post' ? Boolean(post) : Boolean(comment),
+        },
+      };
+    });
+  }
+  async resolveReport(session: AdminSession, reportId: string, body: unknown) {
+    const admin = await this.activeAdmin(session);
+    this.requireAdminRole(admin, 'super_admin', 'operator', 'reviewer');
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException('处理参数无效');
+    const data = body as Record<string, unknown>;
+    if (Object.keys(data).some((key) => !['action', 'reason'].includes(key))) throw new BadRequestException('处理参数无效');
+    const action = data.action;
+    if (action !== 'dismiss' && action !== 'takedown') throw new BadRequestException('处理动作无效');
+    const reason = typeof data.reason === 'string' ? data.reason.trim() : '';
+    if (!reason || reason.length > 500 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(reason)) throw new BadRequestException('请填写1至500字的处理说明');
+    const report = await this.reports.findOneBy({ id: reportId });
+    if (!report) throw new NotFoundException('举报不存在');
+    if (admin.role !== 'super_admin' && (!admin.schoolId || report.schoolId !== admin.schoolId)) throw new ForbiddenException('无权处理该举报');
+    const now = new Date();
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const query = manager.getRepository(ContentReport).createQueryBuilder('report').where('report.id = :id', { id: report.id });
+      if (this.dataSource.options.type === 'mysql') query.setLock('pessimistic_write');
+      const current = await query.getOne();
+      if (!current) throw new NotFoundException('举报不存在');
+      if (current.status !== 'pending') throw new ConflictException('该举报已处理');
+      if (admin.role !== 'super_admin' && current.schoolId !== admin.schoolId) throw new ForbiddenException('无权处理该举报');
+      if (action === 'takedown') {
+        if (current.targetType === 'post') await manager.update(Post, { id: current.targetId }, { status: 'offline', rejectionReason: `举报处理：${reason}`, reviewedBy: admin.id });
+        else await manager.update(PostComment, { id: current.targetId }, { deleted: true, content: '' });
+        await manager.update(ContentReport, { targetType: current.targetType, targetId: current.targetId, status: 'pending' }, { status: 'removed', handledBy: admin.id, handledAt: now, resolution: reason });
+      } else {
+        await manager.update(ContentReport, { id: current.id, status: 'pending' }, { status: 'dismissed', handledBy: admin.id, handledAt: now, resolution: reason });
+      }
+      const updated = await manager.findOneByOrFail(ContentReport, { id: current.id });
+      await manager.save(AuditLog, manager.create(AuditLog, {
+        adminId: admin.id, schoolId: current.schoolId,
+        action: action === 'takedown' ? 'report.takedown' : 'report.dismiss',
+        resourceType: 'report', resourceId: current.id,
+        detail: JSON.stringify({ targetType: current.targetType, targetId: current.targetId, postId: current.postId, reason }),
+      }));
+      return updated;
+    });
+    return { id: saved.id, status: saved.status, handledAt: saved.handledAt, resolution: saved.resolution };
   }
   async adminInvites(admin: AdminSession) { this.requireAdminRole(admin, 'super_admin', 'operator'); if (!admin.schoolId && admin.role !== 'super_admin') throw new ForbiddenException('无学校范围'); return this.invites.findBy({ schoolId: admin.schoolId || (await this.schools.findOneOrFail({ where: { status: 'active' } })).id }); }
   async createInvite(admin: AdminSession, data: { batchName: string; maxUses: number; expiresAt?: string; schoolId?: string }) { this.requireAdminRole(admin, 'super_admin', 'operator'); const schoolId = admin.schoolId || data.schoolId || ''; if (!schoolId) throw new BadRequestException('请选择学校'); this.ensureAdminScope(admin, schoolId); const code = `WC${Math.random().toString(36).slice(2, 8).toUpperCase()}`; const invite = await this.invites.save(this.invites.create({ schoolId, code, batchName: data.batchName?.trim() || '后台创建', maxUses: Math.max(1, Number(data.maxUses) || 1), expiresAt: data.expiresAt ? new Date(data.expiresAt) : null })); await this.audit(admin, 'invite.create', 'invite', invite.id, invite.batchName); return invite; }

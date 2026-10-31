@@ -172,4 +172,22 @@ export class AuditLog extends BaseEntity {
   @Column('text') detail!: string;
 }
 
-export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog];
+@Entity('content_reports')
+@Index('IDX_content_reports_reporter_target', ['reporterId', 'targetType', 'targetId'], { unique: true })
+@Index('IDX_content_reports_school_status_created', ['schoolId', 'status', 'createdAt'])
+@Index('IDX_content_reports_target', ['targetType', 'targetId'])
+export class ContentReport extends BaseEntity {
+  @Column({ length: 36 }) reporterId!: string;
+  @Column({ type: 'varchar', length: 36, nullable: true }) schoolId!: string | null;
+  @Column({ type: 'varchar', length: 20 }) targetType!: 'post' | 'comment';
+  @Column({ length: 36 }) targetId!: string;
+  @Column({ length: 36 }) postId!: string;
+  @Column({ type: 'varchar', length: 20 }) reason!: string;
+  @Column('text') detail!: string;
+  @Column({ default: 'pending' }) status!: 'pending' | 'dismissed' | 'removed';
+  @Column({ type: 'varchar', length: 36, nullable: true }) handledBy!: string | null;
+  @Column({ type: 'datetime', nullable: true }) handledAt!: Date | null;
+  @Column('text') resolution!: string;
+}
+
+export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog, ContentReport];

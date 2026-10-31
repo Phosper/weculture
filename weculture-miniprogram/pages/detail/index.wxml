@@ -18,7 +18,7 @@
     <button wx:else class="button-primary event-button" loading="{{eventBusy}}" disabled="{{eventBusy || !post.event.registerable}}" bindtap="register">{{eventBusy ? '正在处理…' : post.event.actionText}}</button>
     <view wx:if="{{eventError}}" class="event-error">{{eventError}}。可再次点击按钮重试。<button class="button-plain" disabled="{{eventBusy}}" bindtap="retry">重新加载核对状态</button></view>
   </view>
-  <view wx:if="{{post.status === 'approved'}}" class="actions"><button class="button-plain" bindtap="like">{{post.liked ? '已点赞' : '点赞'}} {{post.likeCount}}</button><button class="button-plain" bindtap="favorite">{{post.favorited ? '已收藏' : '收藏'}}</button><button wx:if="{{canShare}}" class="button-plain" open-type="share">分享</button></view>
+  <view wx:if="{{post.status === 'approved'}}" class="actions"><button class="button-plain" bindtap="like">{{post.liked ? '已点赞' : '点赞'}} {{post.likeCount}}</button><button class="button-plain" bindtap="favorite">{{post.favorited ? '已收藏' : '收藏'}}</button><button wx:if="{{canShare}}" class="button-plain" open-type="share">分享</button><button wx:if="{{post.canReport}}" class="button-plain report-entry" bindtap="openPostReport">举报</button></view>
   <view wx:if="{{post.status === 'approved'}}" class="comments-section">
     <view class="comments-heading"><view><text class="section-title">交流与回应</text><text wx:if="{{commentsReady}}" class="comment-count">{{commentCount}}</text></view><button class="comment-link" disabled="{{commentsLoading || commentsMoreLoading}}" bindtap="refreshComments">刷新</button></view>
     <view id="comment-composer" class="comment-composer card">
@@ -36,11 +36,26 @@
         <view class="comment-byline"><text class="comment-author" data-id="{{item.id}}" catchtap="openCommentAuthor">{{item.author.nickname}}</text><text wx:if="{{item.isPostAuthor}}" class="comment-author-tag">作者</text></view>
         <view wx:if="{{item.parent}}" class="comment-parent">回复 {{item.parent.nickname}}<text wx:if="{{item.parent.deleted}}"> · 原评论已删除</text></view>
         <view class="comment-body {{item.deleted ? 'comment-deleted' : ''}}">{{item.deleted ? '评论已删除' : item.content}}</view>
-        <view class="comment-meta"><text class="comment-date">{{item.createdAtText}}</text><view class="comment-controls"><button wx:if="{{item.canReply}}" class="comment-link" data-id="{{item.id}}" disabled="{{commentBusy}}" bindtap="replyComment">回复</button><button wx:if="{{item.canDelete}}" class="comment-link comment-delete" data-id="{{item.id}}" disabled="{{commentBusy || commentDeleteBusyId}}" bindtap="deleteComment">{{commentDeleteBusyId === item.id ? '处理中…' : '删除'}}</button></view></view>
+        <view class="comment-meta"><text class="comment-date">{{item.createdAtText}}</text><view class="comment-controls"><button wx:if="{{item.canReply}}" class="comment-link" data-id="{{item.id}}" disabled="{{commentBusy}}" bindtap="replyComment">回复</button><button wx:if="{{item.canReport}}" class="comment-link" data-id="{{item.id}}" disabled="{{commentBusy}}" bindtap="openCommentReport">举报</button><button wx:if="{{item.canDelete}}" class="comment-link comment-delete" data-id="{{item.id}}" disabled="{{commentBusy || commentDeleteBusyId}}" bindtap="deleteComment">{{commentDeleteBusyId === item.id ? '处理中…' : '删除'}}</button></view></view>
       </view>
     </view>
     <view wx:if="{{commentsError}}" class="comment-load-error"><view>{{commentsError}}</view><button class="button-plain" bindtap="retryComments">重试加载评论</button></view>
     <button wx:elif="{{commentsHasMore}}" class="button-plain comment-more" loading="{{commentsMoreLoading}}" disabled="{{commentsMoreLoading}}" bindtap="loadMoreComments">{{commentsMoreLoading ? '正在加载…' : '查看更多评论'}}</button>
     <view wx:elif="{{commentsReady && comments.length}}" class="comments-end">已展示全部评论</view>
+  </view>
+  <view wx:if="{{reportOpen}}" class="report-mask" catchtap="closeReport">
+    <view class="report-sheet card" catchtap="noop">
+      <view class="report-heading">
+        <view class="report-heading-copy"><view class="report-title">举报{{reportTarget.type === 'comment' ? '评论' : '内容'}}</view><view class="report-target">{{reportTarget.label}}</view></view>
+        <button class="comment-link" disabled="{{reportBusy}}" bindtap="closeReport">关闭</button>
+      </view>
+      <view class="report-reason-list">
+        <button wx:for="{{reportReasons}}" wx:key="code" class="report-reason {{reportReason === item.code ? 'report-reason-active' : ''}}" data-code="{{item.code}}" disabled="{{reportBusy}}" bindtap="chooseReportReason">{{item.label}}</button>
+      </view>
+      <textarea class="report-textarea" value="{{reportDetail}}" placeholder="补充说明（选择“其他”时必填，最多500字）" placeholder-class="comment-placeholder" maxlength="500" disabled="{{reportBusy}}" bindinput="reportDetailInput" auto-height="{{true}}" adjust-position="{{true}}" cursor-spacing="100" show-confirm-bar="{{false}}" />
+      <view class="report-footer"><text class="comment-limit">{{reportLength}} / 500</text><button class="button-primary report-submit" loading="{{reportBusy}}" disabled="{{reportBusy || !reportReason}}" bindtap="submitReport">{{reportBusy ? '正在提交…' : '提交举报'}}</button></view>
+      <view wx:if="{{reportError}}" class="report-error">{{reportError}}</view>
+      <view class="report-note">举报仅用于社区治理。请勿提交与问题无关的内容。</view>
+    </view>
   </view>
 </block></view>
