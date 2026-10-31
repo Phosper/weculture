@@ -1,1 +1,41 @@
-<view class="page"><view class="profile card"><view class="portrait">{{avatarText}}</view><view class="profile-copy"><view class="name">{{user.nickname || '新用户'}}</view><view class="subtle">{{user.verified ? user.school.name + ' · 已认证成员' : '未完成校园认证'}}</view></view></view><view wx:if="{{!user.verified}}" class="card verify"><view><view class="verify-title">校内社区待解锁</view><view class="subtle">认证后可发布动态、报名活动。</view></view><button class="button-primary short" bindtap="verify">去认证</button></view><view class="section-head"><text class="section-title">我的计划</text><text class="subtle">路线与活动</text></view><view wx:if="{{error}}" class="error">{{error}}</view><view wx:if="{{!plans.length}}" class="empty">还没有计划，去旅行页加入路线或报名活动吧。</view><view wx:for="{{plans}}" wx:key="id" class="plan card"><view class="pill">{{item.type === 'event' ? '校内活动' : '旅行路线'}}</view><view class="plan-title">{{item.title}}</view><view class="subtle">{{item.type === 'event' ? item.location : item.stopsText}}</view></view><view class="section-head"><text class="section-title">我的投稿</text><text class="subtle">审核状态</text></view><view wx:if="{{!posts.length}}" class="subtle">暂未发布内容</view><view wx:for="{{posts}}" wx:key="id" class="post-status card"><view><view class="post-title">{{item.title}}</view><view wx:if="{{item.status === 'rejected'}}" class="reject">驳回原因：{{item.rejectionReason}}</view></view><view class="status {{item.status}}">{{item.status === 'approved' ? '已发布' : item.status === 'pending' ? '审核中' : item.status === 'rejected' ? '已驳回' : '已下架'}}</view></view><button class="logout" bindtap="logout">退出登录</button></view>
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="topbar" style="padding-top:{{statusBarHeight}}px;height:{{navBarHeight}}px"><view class="topbar-inner" style="height:{{navContentHeight}}px;padding-right:{{navRightInset}}px"><view class="brand-lockup"><text class="topbar-brand">Weculture</text><text class="brand-subtitle">让文化融入生活</text></view></view></view>
+<view class="page tab-page profile-page">
+  <view class="profile-hero card"><view class="identity-row"><image class="portrait" src="{{user.avatarUrl || '/assets/default-profile-avatar.jpg'}}" mode="aspectFill" /><view class="identity-copy"><view class="name-row"><text class="name">{{user.nickname || '新用户'}}</text><text wx:if="{{user.verified}}" class="verified-mark">✓</text></view><view class="school-line">{{user.verified ? user.school.name + ' · 已认证成员' : '未完成校园认证'}}</view><view class="badge">{{user.verified ? '校园文化成员' : '待认证'}}</view></view></view><view class="stats"><view><text class="stat-num">{{stats.posts}}</text><text class="stat-label">投稿</text></view><view><text class="stat-num">{{stats.plans}}</text><text class="stat-label">计划</text></view><view><text class="stat-num">{{stats.likes}}</text><text class="stat-label">获赞</text></view></view><button class="edit-button button-plain" bindtap="editName">编辑资料</button></view>
+  <view class="profile-quote"><image src="/assets/profile-watercolor.jpg" mode="aspectFill"/><view class="quote-copy"><text>去看更大的世界</text><text>也回到内心的家乡</text></view></view>
+  <view class="profile-shortcuts"><view data-tab="saved" bindtap="changeTab"><text class="shortcut-symbol">♡</text><text>我的收藏</text><text class="shortcut-count">{{favorites.length}}</text></view><view data-tab="routes" bindtap="changeTab"><text class="shortcut-symbol">▢</text><text>已参加</text><text class="shortcut-count">{{joinedCount}}</text></view><view data-tab="routes" bindtap="changeTab"><text class="shortcut-symbol">♧</text><text>我的路线</text><text class="shortcut-count">{{routeCount}}</text></view><view bindtap="toAssistant"><text class="shortcut-symbol">◷</text><text>校园小C</text><text class="shortcut-count">问答</text></view></view>
+  <button class="font-settings" bindtap="fontSettings"><view class="font-settings-copy"><view class="font-settings-title">字体设置</view><view class="font-settings-summary">{{typographySummary}}</view></view><text class="font-settings-arrow">›</text></button>
+  <view wx:if="{{plans.length}}" class="footprint-section"><view class="section-head"><text class="section-title">我的足迹</text><text class="subtle">已加入的活动与路线</text></view><scroll-view scroll-x class="footprint-scroll"><view wx:for="{{plans}}" wx:key="id" class="footprint-item"><image wx:if="{{item.coverUrl || item.imageUrl}}" src="{{item.coverUrl || item.imageUrl}}" mode="aspectFill"/><view wx:else class="footprint-placeholder">文化</view><text>{{item.title}}</text></view></scroll-view></view>
+  <view wx:if="{{!user.verified}}" class="verify card"><view><view class="verify-title">解锁校内社区</view><view class="subtle">认证后可查看校内内容、发布校园投稿</view></view><button class="button-primary short" bindtap="verify">去认证</button></view>
+  <view class="profile-tabs"><view class="profile-tab {{tab === 'notes' ? 'active' : ''}}" data-tab="notes" bindtap="changeTab">笔记</view><view class="profile-tab {{tab === 'saved' ? 'active' : ''}}" data-tab="saved" bindtap="changeTab">收藏</view><view class="profile-tab {{tab === 'routes' ? 'active' : ''}}" data-tab="routes" bindtap="changeTab">路线</view></view>
+  <view wx:if="{{error}}" class="error">{{error}}<button class="button-plain" bindtap="retry">重新加载</button></view>
+  <view wx:if="{{loading}}" class="subtle">正在更新投稿和计划…</view>
+  <view wx:if="{{tab === 'notes'}}">
+    <view class="notes-heading"><text>我的投稿</text><text class="subtle">下拉刷新审核结果，点击预览</text></view>
+    <view wx:if="{{!posts.length && !loading && !error}}" class="empty compact-empty">还没有笔记，去记录第一段文化体验吧。</view>
+    <view class="notes-grid"><view wx:for="{{posts}}" wx:key="id" class="note-item" data-id="{{item.id}}" bindtap="openPost">
+      <view class="note-tile"><image wx:if="{{item.imageUrl}}" src="{{item.imageUrl}}" mode="aspectFill"/><view wx:else class="note-placeholder">{{item.tag}}</view><text class="review-badge status-{{item.status}}">{{item.statusLabel}}</text><view class="note-overlay"><text>{{item.title}}</text><text>♥ {{item.likeCount || 0}}</text></view></view>
+      <view class="note-circle">{{item.circleLabel}}</view>
+      <view wx:if="{{item.reviewReason}}" class="review-reason">{{item.status === 'rejected' ? '驳回原因' : '下架原因'}}：{{item.reviewReason}}</view>
+    </view></view>
+  </view>
+  <view wx:if="{{tab === 'saved'}}"><view wx:if="{{!favorites.length}}" class="empty compact-empty">还没有收藏，遇到喜欢的内容就收起来。</view><view wx:for="{{favorites}}" wx:key="key" class="saved-item card" data-id="{{item.data.id}}" data-type="{{item.type}}" bindtap="openSaved"><image wx:if="{{item.data.imageUrl || item.data.coverUrl}}" src="{{item.data.imageUrl || item.data.coverUrl}}" mode="aspectFill"/><view><view class="saved-title">{{item.data.title}}</view><view class="subtle">{{item.type === 'post' ? '文化内容' : '旅行路线'}}</view></view></view></view>
+  <view wx:if="{{tab === 'routes'}}">
+    <view wx:if="{{stats.plans === 0 && !loading && !error}}" class="empty compact-empty plans-empty">还没有计划，去旅行页加入路线或报名活动吧。</view>
+    <view wx:for="{{plans}}" wx:key="id" class="plan card" data-id="{{item.id}}" data-type="{{item.type}}" bindtap="openPlan">
+      <view class="pill">{{item.type === 'event' ? item.circleLabel + ' · 活动' : '文化路线'}}</view>
+      <view class="plan-title">{{item.title}}</view>
+      <view class="subtle">{{item.type === 'event' ? item.location : item.stopsText}}</view>
+      <block wx:if="{{item.type === 'event'}}">
+        <view class="plan-event-time">开始：{{item.startsAtText}}</view>
+        <view wx:if="{{item.endsAtText}}" class="plan-event-time">结束：{{item.endsAtText}}</view>
+        <view class="plan-event-status">已报名 · {{item.eventStatusText}}</view>
+        <view class="plan-next-step">{{item.eventNextStep}}</view>
+        <button class="button-plain plan-cancel" data-id="{{item.id}}" catchtap="cancelEvent" loading="{{eventBusyId === item.id}}" disabled="{{loading || !!eventBusyId}}">{{eventBusyId === item.id ? '正在处理…' : '取消报名'}}</button>
+        <view wx:if="{{eventErrorId === item.id}}" class="plan-event-error">{{eventError}}。可再次点击“取消报名”重试。</view>
+      </block>
+      <view wx:if="{{item.planMeta}}" class="subtle"><text wx:if="{{item.planMeta.departDate}}">计划出发 {{item.planMeta.departDate}}</text><text wx:if="{{item.planMeta.companions !== null}}">{{item.planMeta.departDate ? ' · ' : ''}}同行 {{item.planMeta.companions}} 人</text></view>
+    </view>
+  </view>
+  <button class="logout" bindtap="logout">退出登录</button>
+</view>

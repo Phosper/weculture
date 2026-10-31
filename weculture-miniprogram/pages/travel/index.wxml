@@ -1,1 +1,30 @@
-<view class="page"><view class="title">文化旅行</view><view class="subtle intro">用你的偏好，生成一条可加入的文化路线。</view><view class="card planner"><view class="label">目的地</view><input value="{{destination}}" placeholder="例如：北京" bindinput="input"/><view class="label">出行天数</view><view class="choices"><view wx:for="{{['1-3天','4-7天','7天以上']}}" wx:key="*this" class="choice {{days === item ? 'selected' : ''}}" data-days="{{item}}" bindtap="chooseDays">{{item}}</view></view><view class="label">旅行偏好</view><view class="choices"><view wx:for="{{options}}" wx:key="label" class="choice {{item.selected ? 'selected' : ''}}" data-value="{{item.label}}" bindtap="togglePreference">{{item.label}}</view></view><button class="button-primary" loading="{{loading}}" bindtap="recommend">生成推荐路线</button></view><view class="section-head"><text class="section-title">推荐路线</text></view><view wx:if="{{error}}" class="error">{{error}}</view><view wx:if="{{!loading && !routes.length}}" class="empty">暂未找到匹配路线，试试调整条件。</view><view wx:for="{{routes}}" wx:key="id" class="route card"><image wx:if="{{item.coverUrl}}" src="{{item.coverUrl}}" mode="aspectFill"/><view class="route-copy"><view class="route-title">{{item.title}}</view><view class="subtle">{{item.stopsText}}</view><view class="highlights">{{item.highlightsText}}</view><view class="route-foot"><text class="price">¥{{item.budget}} / 人</text><button class="button-plain small" data-id="{{item.id}}" bindtap="plan">{{item.planned ? '已加入' : '加入计划'}}</button></view></view></view></view>
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="topbar" style="padding-top:{{statusBarHeight}}px;height:{{navBarHeight}}px"><view class="topbar-inner" style="height:{{navContentHeight}}px;padding-right:{{navRightInset}}px"><view class="brand-lockup"><text class="topbar-brand">Weculture</text><text class="brand-subtitle">让文化融入生活</text></view></view></view>
+<view class="page tab-page travel">
+  <view class="travel-search"><text>⌕</text><input value="{{destination}}" placeholder="搜索目的地、文化路线" bindinput="input" bindconfirm="recommend" confirm-type="search" /></view>
+  <view class="travel-hero"><image src="/assets/travel-jiangnan.jpg" mode="aspectFill"/><view class="travel-hero-shade"></view><view class="travel-hero-copy"><text class="travel-hero-title">走进有故事的地方</text><text class="travel-hero-subtitle">在旅途中，遇见更大的中国</text></view></view>
+  <view class="travel-shortcuts">
+    <view data-preference="文化" bindtap="chooseShortcut"><text class="shortcut-icon">⌂</text><text>文化古城</text></view>
+    <view data-preference="艺术" bindtap="chooseShortcut"><text class="shortcut-icon">✿</text><text>非遗体验</text></view>
+    <view data-preference="美食" bindtap="chooseShortcut"><text class="shortcut-icon">♨</text><text>美食探索</text></view>
+    <view data-preference="自然" bindtap="chooseShortcut"><text class="shortcut-icon">▧</text><text>山水人文</text></view>
+  </view>
+  <view class="section-head route-section-head"><text class="section-title">推荐路线</text><text class="planner-toggle" bindtap="togglePlanner">{{plannerOpen ? '收起筛选' : '筛选文化路线'}}　›</text></view>
+  <view wx:if="{{plannerOpen}}" class="card planner">
+    <view class="planner-title">匹配文化路线库</view><view class="subtle">按天数、预算与兴趣筛选已有路线。</view>
+    <view class="label">出行天数</view><view class="choices"><view wx:for="{{['1-3天','4-7天','7天以上']}}" wx:key="*this" class="choice {{days === item ? 'selected' : ''}}" data-days="{{item}}" bindtap="chooseDays">{{item}}</view></view>
+    <view class="label">计划出发时间</view><picker mode="date" value="{{departDate}}" start="{{minDate}}" bindchange="pickDate"><view class="date-field">{{departDate}}　▾</view></picker>
+    <view class="label">预算区间（每人）</view><view class="choices"><view wx:for="{{budgets}}" wx:key="key" class="choice {{budget === item.key ? 'selected' : ''}}" data-budget="{{item.key}}" bindtap="chooseBudget">{{item.label}}</view></view>
+    <view class="label">旅行偏好</view><view class="choices"><view wx:for="{{options}}" wx:key="label" class="choice {{item.selected ? 'selected' : ''}}" data-value="{{item.label}}" bindtap="togglePreference">{{item.label}}</view></view>
+    <view class="companion-row"><text>同行人 {{companions}} 位（不含本人）</text><view><text class="{{companions === 0 ? 'step-disabled' : ''}}" data-delta="-1" bindtap="changeCompanions">－</text><text class="{{companions === maxCompanions ? 'step-disabled' : ''}}" data-delta="1" bindtap="changeCompanions">＋</text></view></view>
+    <view class="subtle plan-hint">出发时间与同行人数会随加入计划保存，可在个人页查看。</view>
+    <button class="button-primary generate" loading="{{loading}}" disabled="{{loading || !!planBusyId}}" bindtap="recommend">匹配已有路线</button>
+  </view>
+  <view wx:if="{{error}}" class="error">{{error}}<button class="button-plain" bindtap="recommend">重新加载</button></view><view wx:if="{{loading}}" class="subtle">正在匹配路线…</view><view wx:if="{{!loading && !error && !routes.length}}" class="empty">暂未找到匹配路线，试试调整预算或偏好。</view>
+  <view wx:for="{{routes}}" wx:key="id" class="route card">
+    <view class="route-main"><image wx:if="{{item.coverUrl}}" src="{{item.coverUrl}}" mode="aspectFill"/><view class="route-copy"><view class="route-title">{{item.title}}</view><view class="route-stops">{{item.stopsText}}</view><view class="highlights">{{item.highlightsText}}</view><view class="price">¥{{item.budget}}<text class="per"> / 人</text></view></view></view>
+    <view wx:if="{{item.planMeta}}" class="subtle route-plan-meta"><text wx:if="{{item.planMeta.departDate}}">计划出发 {{item.planMeta.departDate}}</text><text wx:if="{{item.planMeta.companions !== null}}">{{item.planMeta.departDate ? ' · ' : ''}}同行 {{item.planMeta.companions}} 人</text></view>
+    <view class="route-foot"><text class="route-badge">文化路线</text><button class="route-join" data-id="{{item.id}}" loading="{{planBusyId === item.id}}" disabled="{{loading || !!planBusyId}}" bindtap="plan">{{planBusyId === item.id ? '正在保存' : planErrorId === item.id ? (retryPlanned ? '重试加入' : '重试移出') : item.planned ? '移出计划' : '加入计划'}}</button></view>
+    <view wx:if="{{planErrorId === item.id}}" class="route-plan-error">{{planError}}。点击上方按钮重试。</view>
+  </view>
+</view>

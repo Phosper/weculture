@@ -1,2 +1,32 @@
-const { api } = require('../../services/api'); const { requireLogin } = require('../../utils/guard');
-Page({ data: { user: null, nickname: '', code: '', error: '', loading: false }, async onLoad() { const user = await requireLogin(this); if (user) this.setData({ user, nickname: user.nickname }); }, input(e) { this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); }, async submit() { if (this.data.loading) return; if (!this.data.user) { this.setData({ error: '登录未完成，请检查网络后重试' }); return; } this.setData({ error: '', loading: true }); try { if (!this.data.user.nickname) await api.patch('/me', { nickname: this.data.nickname }); const user = await api.post('/me/school-verifications', { code: this.data.code }); getApp().globalData.user = user; wx.showModal({ title: '认证成功', content: `已加入${user.school.name}`, showCancel: false, success: () => wx.switchTab({ url: '/pages/community/index' }) }); } catch (error) { this.setData({ error: error.message }); } finally { this.setData({ loading: false }); } } });
+const { withTypography } = require('../../utils/typography');
+const { api } = require('../../services/api');
+const { requireLogin } = require('../../utils/guard');
+const { safeReturnPath } = require('../../utils/return-path');
+const { topicFromPath } = require('../../utils/topics');
+const { authorFromPath } = require('../../utils/authors');
+
+Page(withTypography({
+  data: { user: null, nickname: '', code: '', error: '', loading: false },
+  async onLoad(options = {}) {
+    const returnTo = safeReturnPath(options.returnTo);
+    this.returnTo = returnTo.startsWith('/pages/detail/index?id=') || topicFromPath(returnTo) || authorFromPath(returnTo) ? returnTo : '';
+    const user = await requireLogin(this);
+    if (user) this.setData({ user, nickname: user.nickname });
+  },
+  input(e) { this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); },
+  async submit() {
+    if (this.data.loading) return;
+    if (!this.data.user) { this.setData({ error: '登录未完成，请检查网络后重试' }); return; }
+    this.setData({ error: '', loading: true });
+    try {
+      if (!this.data.user.nickname) await api.patch('/me', { nickname: this.data.nickname });
+      const user = await api.post('/me/school-verifications', { code: this.data.code });
+      getApp().globalData.user = user;
+      wx.showModal({ title: '认证成功', content: `已加入${user.school.name}`, showCancel: false, success: () => {
+        if (this.returnTo) wx.redirectTo({ url: this.returnTo });
+        else wx.switchTab({ url: '/pages/community/index' });
+      } });
+    } catch (error) { this.setData({ error: error.message }); }
+    finally { this.setData({ loading: false }); }
+  }
+}));

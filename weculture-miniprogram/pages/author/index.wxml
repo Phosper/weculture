@@ -1,0 +1,18 @@
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="page author-page">
+  <block wx:if="{{author}}">
+    <view class="author-header">
+      <image wx:if="{{author.avatarUrl}}" class="profile-avatar" src="{{author.avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="profile-avatar profile-initial">{{author.initial}}</view>
+      <view class="profile-copy"><view class="profile-name">{{author.nickname}}</view><text class="profile-label">作者主页</text></view>
+    </view>
+    <view class="works-heading"><text class="section-title">作品</text><text class="works-count">{{author.visiblePostCount}} 条可见作品</text></view>
+    <view class="visibility-note">这里展示你可查看的已发布作品，包含公开内容及符合认证条件的本校内容。<button wx:if="{{user && !user.verified}}" class="verify-link" bindtap="toVerify">完成学校认证</button></view>
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" />
+    <view wx:if="{{!loading && !error && page && !posts.length}}" class="profile-state"><text class="state-title">暂时没有可见作品</text><text class="state-description">这位作者还没有你可以查看的已发布内容。</text><button class="button-plain" bindtap="toDiscover">返回发现</button></view>
+    <button wx:if="{{!loading && !error && hasMore}}" class="button-plain load-more" bindtap="loadMore">加载更多</button>
+    <view wx:if="{{!loading && !error && posts.length && !hasMore}}" class="feed-end">已展示全部可见作品</view>
+  </block>
+  <view wx:if="{{loading}}" class="profile-state state-description">{{page ? '正在加载更多作品…' : author ? '正在加载作品…' : '正在加载作者主页…'}}</view>
+  <view wx:if="{{error}}" class="profile-error"><view>{{error}}</view><button wx:if="{{!loading}}" class="button-plain" bindtap="retry">重新加载</button><button class="button-plain" bindtap="toDiscover">返回发现</button></view>
+</view>

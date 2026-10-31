@@ -1,0 +1,7 @@
+.bar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 100; display: flex; align-items: flex-start; justify-content: space-around; min-height: 112rpx; padding: 10rpx 12rpx 6rpx; padding-bottom: calc(6rpx + env(safe-area-inset-bottom)); background: #FFFFFF; border-top: 1rpx solid #E7E5E2; box-sizing: border-box; box-shadow: 0 -5rpx 22rpx rgba(28,27,31,.035); }
+.tab { flex: 1; min-width: 0; min-height: 96rpx; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; color: #79747E; }
+.tab.selected { color: #C5532E; font-weight: 600; }
+.nav-icon { width: 47rpx; height: 47rpx; margin-bottom: 4rpx; }
+.label { font-size: calc(21rpx * var(--font-scale, 1)); line-height: 30rpx; }
+.publish-icon { width: 48rpx; height: 48rpx; line-height: 44rpx; text-align: center; margin-bottom: 2rpx; border-radius: 50%; background: #C5532E; color: #FFFFFF; font-size: calc(39rpx * var(--font-scale, 1)); font-weight: 400; box-sizing: border-box; }
+.tab:nth-child(3) .label { margin-top: 0; }

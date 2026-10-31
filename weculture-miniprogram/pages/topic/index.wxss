@@ -1,0 +1,19 @@
+.topic-header { padding: 18rpx 0 30rpx; border-bottom: 1rpx solid #EAE7E2; margin-bottom: 22rpx; }
+.topic-kicker { color: #93391D; font-size: calc(20rpx * var(--font-scale, 1)); letter-spacing: 2rpx; }
+.topic-title { margin: 15rpx 0; color: #93391D; font-size: calc(40rpx * var(--font-scale, 1)); font-weight: 700; line-height: 1.45; word-break: break-all; }
+.topic-description { display: block; color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.7; }
+.scope-filters,.type-filters,.time-filters { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 20rpx; }
+.scope-filter { padding: 12rpx 20rpx; color: #79747E; border-bottom: 4rpx solid transparent; font-size: calc(27rpx * var(--font-scale, 1)); }
+.scope-filter.selected { color: #93391D; border-color: #C5532E; font-weight: 700; }
+.type-filter,.time-filter { padding: 11rpx 20rpx; color: #625D65; background: #ECEAE7; border-radius: 999rpx; font-size: calc(22rpx * var(--font-scale, 1)); }
+.type-filter.selected,.time-filter.selected { color: #93391D; background: #F7E7DE; }
+.time-panel { margin-bottom: 22rpx; }
+.time-panel .time-filters { margin-bottom: 12rpx; }
+.time-note,.result-count { color: #79747E; font-size: calc(21rpx * var(--font-scale, 1)); line-height: 1.6; }
+.results-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12rpx; margin: 30rpx 0 20rpx; }
+.topic-empty { display: flex; flex-direction: column; align-items: center; gap: 16rpx; padding: 44rpx 16rpx; text-align: center; }
+.empty-title { font-size: calc(28rpx * var(--font-scale, 1)); font-weight: 700; }
+.empty-description { color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.7; }
+.topic-empty button,.error button { margin: 10rpx 0 0; max-width: 100%; padding: 0 24rpx; font-size: calc(24rpx * var(--font-scale, 1)); white-space: normal; }
+.load-more { margin: 22rpx auto; font-size: calc(24rpx * var(--font-scale, 1)); }
+.feed-end { padding: 18rpx 0; color: #79747E; text-align: center; font-size: calc(22rpx * var(--font-scale, 1)); }

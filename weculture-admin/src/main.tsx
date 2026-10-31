@@ -1,35 +1,36 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AuditOutlined, BookOutlined, DashboardOutlined, KeyOutlined, LogoutOutlined, MessageOutlined, SafetyCertificateOutlined, TeamOutlined } from '@ant-design/icons';
 import { Alert, App as AntApp, Button, Card, Col, ConfigProvider, Form, Input, Layout, Menu, Modal, Row, Select, Space, Statistic, Table, Tag, Typography, message } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { client } from './api';
+import { ApiError, client, onSessionExpired } from './api';
+import { Posts, type Admin } from './posts';
 import './style.css';
 
-type Admin = { username: string; role: string; schoolId?: string | null };
-const statusColors: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', offline: 'default' };
-const statusText: Record<string, string> = { pending: '待审核', approved: '已通过', rejected: '已驳回', offline: '已下架' };
+const reviewScope = import.meta.env.VITE_ADMIN_SCOPE === 'review';
 
-function Login({ onLogin }: { onLogin: (admin: Admin) => void }) {
+function Login({ onLogin, notice }: { onLogin: (admin: Admin) => void; notice?: string }) {
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
   const demoLogin = import.meta.env.DEV ? { username: 'admin', password: 'Weculture@2026' } : undefined;
-  const submit = async (values: { username: string; password: string }) => { setLoading(true); try { const result = await client.post('/admin/auth/login', values); localStorage.setItem('adminToken', result.token); onLogin(result.admin); } catch (error) { message.error((error as Error).message); } finally { setLoading(false); } };
-  return <main className="login"><section className="login-art"><div className="brand">Weculture</div><h1>让校园文化运营<br />有序发生</h1><p>单校内测运营后台</p></section><Card className="login-card" bordered={false}><Typography.Title level={3}>管理员登录</Typography.Title><Typography.Paragraph type="secondary">使用学校或平台管理员账号进入。</Typography.Paragraph><Form layout="vertical" onFinish={submit} initialValues={demoLogin}><Form.Item name="username" label="账号" rules={[{ required: true }]}><Input size="large" /></Form.Item><Form.Item name="password" label="密码" rules={[{ required: true }]}><Input.Password size="large" /></Form.Item><Button htmlType="submit" type="primary" size="large" block loading={loading}>登录后台</Button></Form>{import.meta.env.DEV && <Alert className="login-note" message="本地演示账号已预填，生产构建不会包含这些登录信息。" type="info" showIcon />}</Card></main>;
+  const submit = async (values: { username: string; password: string }) => {
+    if (loading) return;
+    setLoading(true); setLoginError('');
+    try { const result = await client.post('/admin/auth/login', values); localStorage.setItem('adminToken', result.token); setLoginError(''); onLogin(result.admin); }
+    catch (error) { setLoginError(error instanceof ApiError ? error.message : '登录未完成，请稍后重试'); }
+    finally { setLoading(false); }
+  };
+  return <main className="login"><section className="login-art"><div className="brand">Weculture</div><h1>让文化交流<br />有序发生</h1><p>{reviewScope ? '线上投稿审核' : '同城、国际与校园文化运营后台'}</p></section><Card className="login-card" bordered={false}><Typography.Title level={3}>管理员登录</Typography.Title><Typography.Paragraph type="secondary">使用学校或平台管理员账号进入。{reviewScope && '登录后查看权限范围内的真实投稿。'}</Typography.Paragraph>{notice && <Alert className="session-note" message={notice} type="info" showIcon />}<Form layout="vertical" onFinish={submit} initialValues={demoLogin}><Form.Item name="username" label="账号" rules={[{ required: true }]}><Input size="large" autoComplete="username" /></Form.Item><Form.Item name="password" label="密码" rules={[{ required: true }]}><Input.Password size="large" autoComplete="current-password" /></Form.Item>{loginError && <Alert className="session-note" message={loginError} type="error" showIcon />}<Button htmlType="submit" type="primary" size="large" block loading={loading}>登录后台</Button></Form>{import.meta.env.DEV && <Alert className="login-note" message="本地演示账号已预填，生产构建不会包含这些登录信息。" type="info" showIcon />}</Card></main>;
 }
 
 function Dashboard() {
-  const [data, setData] = useState<any>(); useEffect(() => { void client.get('/admin/dashboard').then(setData).catch((e) => message.error(e.message)); }, []);
-  if (!data) return <div className="loading">正在读取运营概览...</div>;
+  const [data, setData] = useState<any>(); const [error, setError] = useState('');
+  const load = useCallback(async () => { setError(''); try { setData(await client.get('/admin/dashboard')); } catch (failure) { setError((failure as Error).message); } }, []);
+  useEffect(() => { void load(); }, [load]);
+  if (!data) return error ? <Alert type="error" showIcon message="运营概览读取失败" description={error} action={<Button onClick={() => void load()}>重试</Button>} /> : <div className="loading">正在读取运营概览...</div>;
   return <><Typography.Title level={2}>运营工作台</Typography.Title><Typography.Paragraph type="secondary">优先处理待审核内容，所有管理操作均会记录审计日志。</Typography.Paragraph><Row gutter={[18, 18]}><Metric title="待审核内容" value={data.pendingPosts} tone="orange" /><Metric title="已发布内容" value={data.approvedPosts} tone="green" /><Metric title="认证成员" value={data.users} tone="blue" /><Metric title="进行中活动" value={data.activeEvents} tone="brown" /></Row><Card title="近期管理操作" className="table-card"><Table size="middle" pagination={false} dataSource={data.recentAudits} rowKey="id" columns={[{ title: '时间', dataIndex: 'createdAt', render: (x: string) => new Date(x).toLocaleString() }, { title: '操作', dataIndex: 'action' }, { title: '资源', render: (_: unknown, r: any) => `${r.resourceType} / ${r.resourceId.slice(0, 8)}` }, { title: '结果', dataIndex: 'result', render: (x: string) => <Tag color="green">{x}</Tag> }]} /></Card></>;
 }
 function Metric({ title, value, tone }: { title: string; value: number; tone: string }) { return <Col xs={24} sm={12} lg={6}><Card className={`metric ${tone}`}><Statistic title={title} value={value} /></Card></Col>; }
-
-function Posts() {
-  const [posts, setPosts] = useState<any[]>([]); const [status, setStatus] = useState('pending'); const [reason, setReason] = useState(''); const [selected, setSelected] = useState<any>();
-  const load = () => client.get<any[]>(`/admin/posts?status=${status}`).then(setPosts).catch((e) => message.error(e.message)); useEffect(() => { void load(); }, [status]);
-  const review = async (next: string) => { if (!selected) return; try { await client.post(`/admin/posts/${selected.id}/review`, { status: next, reason }); message.success(next === 'approved' ? '内容已通过' : next === 'rejected' ? '内容已驳回' : '内容已下架'); setSelected(undefined); setReason(''); load(); } catch (e) { message.error((e as Error).message); } };
-  return <><Typography.Title level={2}>内容审核</Typography.Title><Space className="toolbar"><Select value={status} onChange={setStatus} options={[{ value: 'pending', label: '待审核' }, { value: 'approved', label: '已通过' }, { value: 'rejected', label: '已驳回' }, { value: 'offline', label: '已下架' }]} /></Space><Card className="table-card"><Table dataSource={posts} rowKey="id" pagination={{ pageSize: 8 }} columns={[{ title: '标题', dataIndex: 'title' }, { title: '类型', dataIndex: 'type', render: (x: keyof typeof statusText) => ({ dynamic: '动态', event: '活动', market: '闲置' } as Record<string, string>)[x] }, { title: '范围', dataIndex: 'visibility', render: (x: string) => x === 'school' ? '校内' : '平台' }, { title: '状态', dataIndex: 'status', render: (x: string) => <Tag color={statusColors[x]}>{statusText[x]}</Tag> }, { title: '提交时间', dataIndex: 'createdAt', render: (x: string) => new Date(x).toLocaleString() }, { title: '操作', render: (_: unknown, r: any) => <Button type="link" onClick={() => setSelected(r)}>查看与处理</Button> }]} /></Card><Modal title="审核内容" open={Boolean(selected)} onCancel={() => setSelected(undefined)} footer={null}><Typography.Title level={4}>{selected?.title}</Typography.Title><Typography.Paragraph>{selected?.content}</Typography.Paragraph><Tag>{selected?.tag}</Tag><Form layout="vertical" style={{ marginTop: 18 }}><Form.Item label="驳回原因（驳回时必填）"><Input.TextArea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder="请向用户说明处理原因" /></Form.Item><Space><Button type="primary" onClick={() => review('approved')}>审核通过</Button><Button danger onClick={() => review('rejected')}>驳回</Button><Button onClick={() => review('offline')}>下架</Button></Space></Form></Modal></>;
-}
 
 function Invites() {
   const [rows, setRows] = useState<any[]>([]); const [form] = Form.useForm(); const load = () => client.get<any[]>('/admin/invites').then(setRows).catch((e) => message.error(e.message)); useEffect(() => { void load(); }, []); const create = async (values: any) => { try { const result = await client.post<any>('/admin/invites', values); message.success(`邀请码 ${result.code} 已创建`); form.resetFields(); void load(); } catch (e) { message.error((e as Error).message); } };
@@ -43,6 +44,50 @@ function ResourceManager({ kind }: { kind: 'route' | 'knowledge' }) {
 
 function Users() { const [rows, setRows] = useState<any[]>([]); useEffect(() => { void client.get<any[]>('/admin/users').then(setRows).catch((e) => message.error(e.message)); }, []); return <><Typography.Title level={2}>校内成员</Typography.Title><Card className="table-card"><Table dataSource={rows} rowKey={(x) => x.membership.id} columns={[{ title: '昵称', render: (_: unknown, r: any) => r.user?.nickname || '未补全' }, { title: '认证状态', dataIndex: ['membership', 'verificationStatus'], render: () => <Tag color="green">已认证</Tag> }, { title: '加入时间', dataIndex: ['membership', 'createdAt'], render: (x: string) => new Date(x).toLocaleString() }]} /></Card></>; }
 
-function Console({ admin, onLogout }: { admin: Admin; onLogout: () => void }) { const [key, setKey] = useState('dashboard'); const content = key === 'dashboard' ? <Dashboard /> : key === 'posts' ? <Posts /> : key === 'invites' ? <Invites /> : key === 'routes' ? <ResourceManager kind="route" /> : key === 'knowledge' ? <ResourceManager kind="knowledge" /> : <Users />; const items = [{ key: 'dashboard', icon: <DashboardOutlined />, label: '工作台' }, { key: 'posts', icon: <SafetyCertificateOutlined />, label: '内容审核' }, { key: 'invites', icon: <KeyOutlined />, label: '邀请码' }, { key: 'routes', icon: <BookOutlined />, label: '旅行路线' }, { key: 'knowledge', icon: <MessageOutlined />, label: '小C知识库' }, { key: 'users', icon: <TeamOutlined />, label: '校内成员' }]; return <Layout className="shell"><Layout.Sider breakpoint="lg" collapsedWidth="0" className="sider"><div className="logo">Weculture<span>运营后台</span></div><Menu theme="dark" mode="inline" selectedKeys={[key]} items={items} onClick={(e) => setKey(e.key)} /><div className="sider-footer"><div>{admin.username}</div><small>{admin.role === 'super_admin' ? '平台超级管理员' : '学校运营管理员'}</small><Button icon={<LogoutOutlined />} type="text" onClick={onLogout}>退出</Button></div></Layout.Sider><Layout><Layout.Header className="topbar"><span><AuditOutlined /> 所有管理操作均记录审计日志</span></Layout.Header><Layout.Content className="content">{content}</Layout.Content></Layout></Layout>; }
-function Root() { const [admin, setAdmin] = useState<Admin | null>(null); const logout = () => { localStorage.removeItem('adminToken'); setAdmin(null); }; return <AntApp>{admin ? <Console admin={admin} onLogout={logout} /> : <Login onLogin={setAdmin} />}</AntApp>; }
+function Console({ admin, onLogout }: { admin: Admin; onLogout: () => void }) {
+  const [key, setKey] = useState('dashboard');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const canManage = admin.role === 'super_admin' || (admin.role === 'operator' && Boolean(admin.schoolId));
+  const content = key === 'posts' ? <Posts admin={admin} /> : !reviewScope && canManage && key === 'invites' ? <Invites /> : !reviewScope && canManage && key === 'routes' ? <ResourceManager kind="route" /> : !reviewScope && canManage && key === 'knowledge' ? <ResourceManager kind="knowledge" /> : !reviewScope && canManage && key === 'users' ? <Users /> : <Dashboard />;
+  const items = [{ key: 'dashboard', icon: <DashboardOutlined />, label: '工作台' }, { key: 'posts', icon: <SafetyCertificateOutlined />, label: canManage ? '内容审核与发布' : '内容审核' }, ...(!reviewScope && canManage ? [{ key: 'invites', icon: <KeyOutlined />, label: '邀请码' }, { key: 'routes', icon: <BookOutlined />, label: '旅行路线' }, { key: 'knowledge', icon: <MessageOutlined />, label: '小C知识库' }, { key: 'users', icon: <TeamOutlined />, label: '校内成员' }] : [])];
+  const roleLabel = admin.role === 'super_admin' ? '平台超级管理员' : admin.role === 'reviewer' ? '学校内容审核员' : '学校运营管理员';
+  return <Layout className="shell"><Layout.Sider breakpoint="lg" collapsedWidth="0" className="sider"><div className="logo">Weculture<span>{reviewScope ? '线上审核' : '运营后台'}</span></div><Menu theme="dark" mode="inline" selectedKeys={[key]} items={items} onClick={(event) => setKey(event.key)} /><div className="sider-footer"><div>{admin.username}</div><small>{roleLabel}</small><Space direction="vertical"><Button icon={<KeyOutlined />} type="text" onClick={() => setPasswordOpen(true)}>修改密码</Button><Button icon={<LogoutOutlined />} type="text" onClick={onLogout}>退出</Button></Space></div></Layout.Sider><Layout><Layout.Header className="topbar"><span><AuditOutlined /> {reviewScope ? '线上投稿审核 · 所有处理均记录审计日志' : '所有管理操作均记录审计日志'}</span></Layout.Header><Layout.Content className="content">{content}</Layout.Content></Layout><ChangePassword open={passwordOpen} onClose={() => setPasswordOpen(false)} onChanged={onLogout} /></Layout>;
+}
+
+function ChangePassword({ open, onClose, onChanged }: { open: boolean; onClose: () => void; onChanged: () => void }) {
+  const [form] = Form.useForm(); const [saving, setSaving] = useState(false); const [error, setError] = useState('');
+  useEffect(() => { if (open) { form.resetFields(); setError(''); } }, [open, form]);
+  const submit = async (values: { currentPassword: string; newPassword: string }) => {
+    if (saving) return;
+    setSaving(true); setError('');
+    try { await client.post('/admin/me/password', { currentPassword: values.currentPassword, newPassword: values.newPassword }); form.resetFields(); onClose(); onChanged(); message.success('密码已修改，请使用新密码重新登录'); }
+    catch (failure) { setError((failure as Error).message); }
+    finally { setSaving(false); }
+  };
+  const validateNewPassword = (_: unknown, value: string) => {
+    if (!value || value.length < 12 || !/[a-z]/.test(value) || !/[A-Z]/.test(value) || !/[0-9]/.test(value) || !/[^A-Za-z0-9\s]/.test(value)) return Promise.reject(new Error('至少 12 个字符，并包含大小写字母、数字和符号'));
+    if (new TextEncoder().encode(value).length > 72) return Promise.reject(new Error('新密码过长，请缩短后重试'));
+    return Promise.resolve();
+  };
+  return <Modal title="修改密码" open={open} onCancel={() => { if (!saving) { form.resetFields(); onClose(); } }} footer={null} maskClosable={!saving} closable={!saving} destroyOnClose><Typography.Paragraph type="secondary">新密码至少 12 个字符，包含大写字母、小写字母、数字和符号。修改成功后需要重新登录。</Typography.Paragraph>{error && <Alert className="session-note" type="error" showIcon message={error} />}<Form form={form} layout="vertical" onFinish={submit} disabled={saving}><Form.Item name="currentPassword" label="当前密码" rules={[{ required: true, message: '请输入当前密码' }]}><Input.Password autoComplete="current-password" /></Form.Item><Form.Item name="newPassword" label="新密码" rules={[{ validator: validateNewPassword }]}><Input.Password autoComplete="new-password" /></Form.Item><Form.Item name="confirmPassword" label="确认新密码" dependencies={['newPassword']} rules={[{ required: true, message: '请再次输入新密码' }, ({ getFieldValue }) => ({ validator: (_: unknown, value: string) => !value || getFieldValue('newPassword') === value ? Promise.resolve() : Promise.reject(new Error('两次新密码不一致')) })]}><Input.Password autoComplete="new-password" /></Form.Item><Space><Button type="primary" htmlType="submit" loading={saving}>修改密码</Button><Button disabled={saving} onClick={() => { form.resetFields(); onClose(); }}>取消</Button></Space></Form></Modal>;
+}
+
+function Root() {
+  const [admin, setAdmin] = useState<Admin | null>(null); const [restoring, setRestoring] = useState(Boolean(localStorage.getItem('adminToken'))); const [restoreError, setRestoreError] = useState(''); const [notice, setNotice] = useState(''); const restoreVersion = useRef(0);
+  const logout = useCallback(() => { restoreVersion.current += 1; localStorage.removeItem('adminToken'); setAdmin(null); setRestoring(false); setRestoreError(''); }, []);
+  const restore = useCallback(async () => {
+    const version = ++restoreVersion.current; const token = localStorage.getItem('adminToken');
+    if (!token) { setRestoring(false); setRestoreError(''); return; }
+    setRestoring(true); setRestoreError('');
+    try { const current = await client.get<Admin>('/admin/me'); if (version === restoreVersion.current && localStorage.getItem('adminToken') === token) setAdmin(current); }
+    catch (failure) {
+      if (version !== restoreVersion.current) return;
+      if (failure instanceof ApiError && [401, 403].includes(failure.status || 0)) { logout(); setNotice('登录已失效，请重新登录'); }
+      else setRestoreError((failure as Error).message);
+    } finally { if (version === restoreVersion.current) setRestoring(false); }
+  }, [logout]);
+  useEffect(() => { const unsubscribe = onSessionExpired(() => { logout(); setNotice('登录已过期，请重新登录'); }); void restore(); return () => { unsubscribe(); restoreVersion.current += 1; }; }, [logout, restore]);
+  const loggedIn = (current: Admin) => { restoreVersion.current += 1; setAdmin(current); setRestoring(false); setRestoreError(''); setNotice(''); };
+  return <AntApp>{restoring ? <div className="loading">正在恢复登录...</div> : restoreError ? <main className="session-recovery"><Card><Typography.Title level={3}>暂时无法恢复登录</Typography.Title><Typography.Paragraph>{restoreError}</Typography.Paragraph><Space><Button type="primary" onClick={() => void restore()}>重试</Button><Button onClick={logout}>重新登录</Button></Space></Card></main> : admin ? <Console admin={admin} onLogout={logout} /> : <Login onLogin={loggedIn} notice={notice} />}</AntApp>;
+}
 createRoot(document.getElementById('root')!).render(<React.StrictMode><ConfigProvider locale={zhCN} theme={{ token: { colorPrimary: '#C5532E', borderRadius: 8, fontFamily: 'PingFang SC, Microsoft YaHei, sans-serif' } }}><Root /></ConfigProvider></React.StrictMode>);

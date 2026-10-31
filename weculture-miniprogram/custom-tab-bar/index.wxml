@@ -1,0 +1,7 @@
+<view class="bar" style="{{fontPageStyle}}">
+  <view class="tab {{selected === index ? 'selected' : ''}}" wx:for="{{tabs}}" wx:key="pagePath" data-index="{{index}}" bindtap="switchTab">
+    <view wx:if="{{index === 2}}" class="publish-icon">＋</view>
+    <image wx:else class="nav-icon" src="/assets/nav-{{item.icon}}-{{selected === index ? 'on' : 'off'}}.svg" />
+    <text class="label">{{item.text}}</text>
+  </view>
+</view>

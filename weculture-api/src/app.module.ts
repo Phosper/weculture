@@ -5,10 +5,11 @@ import { AppService } from './app.service';
 import { AdminGuard, UserGuard } from './auth';
 import { ENTITIES } from './entities';
 import { createDatabaseOptions } from './database';
+import { CityLocationController, CityLocationService } from './city-location';
 
 @Module({
   imports: [TypeOrmModule.forRoot(createDatabaseOptions()), TypeOrmModule.forFeature(ENTITIES)],
-  controllers: [AppController],
-  providers: [AppService, UserGuard, AdminGuard],
+  controllers: [AppController, CityLocationController],
+  providers: [AppService, CityLocationService, UserGuard, AdminGuard],
 })
 export class AppModule {}

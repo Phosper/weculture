@@ -1,7 +1,25 @@
-<view class="post card" bindtap="open">
-  <image wx:if="{{post.imageUrl}}" class="cover" src="{{post.imageUrl}}" mode="aspectFill" />
-  <view class="post-top"><view class="pill">{{post.tag || '校园动态'}}</view><text class="time">{{post.createdAtText}}</text></view>
-  <view class="post-title">{{post.title}}</view><view class="post-content">{{post.content}}</view>
-  <view wx:if="{{post.event}}" class="event"><view><text class="event-name">{{post.event.location}}</text><text>{{post.event.startsAtText}}</text></view><text class="event-action">{{post.event.registered ? '已报名' : '可报名'}}</text></view>
-  <view class="post-bottom"><view class="author">{{post.author.nickname}}</view><view class="actions"><text catchtap="like">{{post.liked ? '已赞' : '点赞'}} {{post.likeCount}}</text><text catchtap="favorite">{{post.favorited ? '已收藏' : '收藏'}}</text></view></view>
+<view class="post card {{compact ? 'compact' : ''}} {{post.type}}" bindtap="open">
+  <view class="author-row">
+    <view class="author-link" catchtap="openAuthor">
+      <image wx:if="{{post.author.avatarUrl}}" class="author-avatar" src="{{post.author.avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="author-initial">{{post.author.initial}}</view>
+      <view class="author-text"><text class="author-name">{{post.author.nickname}}</text><text class="time">{{compact && post.author.schoolLabel ? post.author.schoolLabel : post.createdAtText}}</text></view>
+    </view>
+    <text class="more-mark">···</text>
+  </view>
+  <view wx:if="{{post.imageUrl}}" class="cover-wrap">
+    <view wx:if="{{!compact && post.collageImages}}" class="cover-collage"><image class="collage-main" src="{{post.communityImageUrl}}" mode="aspectFill"/><view class="collage-side"><image src="{{post.collageImages[0]}}" mode="aspectFill"/><image src="{{post.collageImages[1]}}" mode="aspectFill"/></view></view>
+    <image wx:else class="cover {{post.cardTall ? 'tall' : ''}}" src="{{post.imageUrl}}" mode="aspectFill" />
+    <text wx:if="{{post.tag}}" class="image-tag" catchtap="openTopic"># {{post.tag}}</text>
+  </view>
+  <view class="post-body">
+    <view wx:if="{{post.circleLabel || (!post.imageUrl && post.tag)}}" class="post-meta">
+      <text wx:if="{{post.circleLabel}}" class="circle-label">{{post.circleLabel}}</text>
+      <text wx:if="{{!post.imageUrl && post.tag}}" class="plain-tag" catchtap="openTopic"># {{post.tag}}</text>
+    </view>
+    <view class="post-title">{{post.title}}</view>
+    <view wx:if="{{!compact}}" class="post-content">{{post.content}}</view>
+  </view>
+  <view wx:if="{{post.event && !compact}}" class="event-row"><view><text class="event-name">{{post.event.location}}</text><text class="event-time">{{post.event.startsAtText}}</text></view><text class="event-action">{{post.event.actionText}}</text></view>
+  <view class="post-bottom"><text catchtap="like">{{post.liked ? '♥' : '♡'}} {{post.likeCount || 0}}</text><text catchtap="favorite">{{compact ? (post.favorited ? '★' : '☆') : (post.favorited ? '已收藏' : '收藏')}}</text></view>
 </view>

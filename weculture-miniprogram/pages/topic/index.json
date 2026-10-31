@@ -1,0 +1,5 @@
+{
+  "navigationBarTitleText": "话题",
+  "enablePullDownRefresh": true,
+  "usingComponents": { "post-card": "/components/post-card/index" }
+}

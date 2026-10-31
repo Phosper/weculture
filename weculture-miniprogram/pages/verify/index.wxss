@@ -1,1 +1,1 @@
-.intro { margin:34rpx 0; }.label { margin:20rpx 0 10rpx; color:#675E5A; }.card input { border-bottom:1rpx solid #E6DED9; padding:18rpx 0; }.card button { margin-top:36rpx; }.tip { font-size:24rpx; color:#756B66; margin-top:20rpx; }
+.intro { margin:34rpx 0; }.label { margin:20rpx 0 10rpx; color:#675E5A; }.card input { width:100%; height:88rpx; padding:0; line-height:1.5; box-sizing:border-box; border-bottom:1rpx solid #E6DED9; }.card button { margin-top:36rpx; }.tip { font-size: calc(24rpx * var(--font-scale, 1)); color:#756B66; margin-top:20rpx; line-height:1.5; }

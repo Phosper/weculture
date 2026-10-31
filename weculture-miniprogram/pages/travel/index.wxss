@@ -1,1 +1,52 @@
-.intro { margin:8rpx 0 24rpx; }.label { font-size:25rpx; color:#675E5A; margin:20rpx 0 10rpx; }.planner input { border-bottom:1rpx solid #E6DED9; padding:14rpx 0; }.choices { display:flex; flex-wrap:wrap; gap:12rpx; }.choice { padding:12rpx 18rpx; background:#F7F2EF; color:#756B66; border-radius:999rpx; font-size:24rpx; }.choice.selected { color:#FFFFFF; background:#C5532E; }.planner button { margin-top:28rpx; }.route { display:flex; padding:0; overflow:hidden; margin-bottom:18rpx; }.route image { width:200rpx; height:230rpx; }.route-copy { flex:1; padding:20rpx; min-width:0; }.route-title { font-size:29rpx; font-weight:700; margin-bottom:8rpx; }.highlights { margin:12rpx 0; color:#8C391D; font-size:23rpx; }.route-foot { display:flex; justify-content:space-between; align-items:center; }.price { color:#C5532E; font-weight:700; }.small { font-size:22rpx; line-height:2; margin:0; }
+.travel { padding-top: 20rpx; }
+.travel-search { display: flex; align-items: center; height: 72rpx; padding: 0 22rpx; margin-bottom: 16rpx; border-radius: 999rpx; background: #ECEAE7; color: #79747E; }
+.travel-search text { font-size: calc(31rpx * var(--font-scale, 1)); margin-right: 12rpx; }
+.travel-search input { flex: 1; min-width: 0; height: 58rpx; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.5; }
+.travel-eyebrow { color: #C5532E; font-size: calc(21rpx * var(--font-scale, 1)); font-weight: 700; letter-spacing: 3rpx; margin-bottom: 10rpx; }
+.intro { margin: 6rpx 0 24rpx; }
+.travel-hero { position: relative; height: 400rpx; overflow: hidden; border-radius: 24rpx; background: #D9D4C8; margin-bottom: 17rpx; }
+.travel-hero image { width: 100%; height: 100%; }
+.travel-hero-shade { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: linear-gradient(0deg, rgba(15,21,20,.73), rgba(15,21,20,0) 67%); }
+.travel-hero-copy { position: absolute; left: 26rpx; right: 26rpx; bottom: 26rpx; display: flex; flex-direction: column; gap: 5rpx; color: #FFFFFF; }
+.travel-hero-title { font-size: calc(34rpx * var(--font-scale, 1)); font-weight: 700; }
+.travel-hero-subtitle { font-size: calc(21rpx * var(--font-scale, 1)); }
+.travel-shortcuts { display: flex; gap: 10rpx; margin-bottom: 8rpx; }
+.travel-shortcuts > view { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8rpx; color: #49454F; font-size: calc(20rpx * var(--font-scale, 1)); }
+.shortcut-icon { width: 78rpx; height: 78rpx; line-height: 78rpx; text-align: center; border-radius: 50%; background: #F3ECE5; color: #C5532E; font-size: calc(40rpx * var(--font-scale, 1)); }
+.travel-shortcuts > view:nth-child(2) .shortcut-icon { background: #F4E9E0; }
+.travel-shortcuts > view:nth-child(3) .shortcut-icon { background: #EBF0E9; color: #6B865F; }
+.travel-shortcuts > view:nth-child(4) .shortcut-icon { background: #F0EDE7; }
+.route-section-head { flex-wrap: wrap; margin: 32rpx 0 20rpx; }
+.planner-toggle { color: #79747E; font-size: calc(21rpx * var(--font-scale, 1)); }
+.planner-title { color: #1C1B1F; font-size: calc(29rpx * var(--font-scale, 1)); font-weight: 700; }
+.planner { padding: 28rpx; margin-bottom: 22rpx; background: linear-gradient(145deg, #FFF4ED 0, #FFFFFF 155rpx); }
+.label { font-size: calc(25rpx * var(--font-scale, 1)); color: #49454F; margin: 24rpx 0 12rpx; font-weight: 600; }
+.destination-row,.date-field { height: 72rpx; border: 1rpx solid #CAC4CF; border-radius: 10rpx; background: #FDFCFA; padding: 0 18rpx; display: flex; align-items: center; box-sizing: border-box; }
+.destination-row text { font-size: calc(32rpx * var(--font-scale, 1)); color: #79747E; margin-right: 12rpx; }
+.destination-row input { flex: 1; font-size: calc(25rpx * var(--font-scale, 1)); }
+.date-field { color: #C5532E; font-size: calc(24rpx * var(--font-scale, 1)); }
+.choices { display: flex; flex-wrap: wrap; gap: 12rpx; }
+.choice { padding: 12rpx 20rpx; background: #F2F1EE; color: #49454F; border-radius: 999rpx; font-size: calc(23rpx * var(--font-scale, 1)); }
+.choice.selected { color: #FFFFFF; background: #C5532E; }
+.companion-row { display: flex; align-items: center; justify-content: space-between; margin-top: 28rpx; color: #C5532E; font-size: calc(24rpx * var(--font-scale, 1)); }
+.companion-row view { display: flex; gap: 22rpx; }
+.companion-row view text { width: 44rpx; height: 44rpx; line-height: 42rpx; text-align: center; border: 1rpx solid #CAC4CF; border-radius: 50%; }
+.generate { margin-top: 24rpx; font-size: calc(27rpx * var(--font-scale, 1)); }
+.route { padding: 16rpx; overflow: hidden; margin-bottom: 18rpx; box-shadow: 0 7rpx 22rpx rgba(28,27,31,.045); }
+.route-main { display: flex; gap: 20rpx; }
+.route image { width: 176rpx; min-width: 176rpx; height: 196rpx; border-radius: 15rpx; }
+.route-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8rpx; }
+.route-title { font-size: calc(26rpx * var(--font-scale, 1)); font-weight: 700; line-height: 1.3; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.route-stops { color: #49454F; font-size: calc(21rpx * var(--font-scale, 1)); line-height: 1.5; word-break: break-all; }
+.highlights { color: #79747E; font-size: calc(20rpx * var(--font-scale, 1)); line-height: 1.3; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.route-foot { display: flex; align-items: center; justify-content: space-between; gap: 8rpx; border-top: 1rpx solid #E7E5E2; margin-top: 15rpx; padding-top: 12rpx; }
+.route-badge { background: #FDE8DD; color: #C5532E; border-radius: 5rpx; padding: 6rpx 12rpx; font-size: calc(19rpx * var(--font-scale, 1)); }
+.route-controls { display: flex; align-items: center; gap: 14rpx; }
+.price { color: #C5532E; font-size: calc(28rpx * var(--font-scale, 1)); font-weight: 700; word-break: break-all; margin-top: auto; }
+.per { font-size: calc(18rpx * var(--font-scale, 1)); font-weight: 400; }
+.route-join { min-width: 116rpx; margin: 0; line-height: 1.5; padding: 9rpx 14rpx; box-sizing: border-box; text-align: center; color: #FFFFFF; background: #C5532E; font-size: calc(20rpx * var(--font-scale, 1)); font-weight: 600; white-space: nowrap; border-radius: 999rpx; }
+.route-join::after { border: 0; }
+.route-join[disabled] { background: #B9A79D; color: #FFFFFF; }
+.route-plan-meta, .plan-hint { margin-top: 16rpx; line-height: 1.6; }
+.route-plan-error { margin-top: 12rpx; color: #A33629; font-size: calc(21rpx * var(--font-scale, 1)); line-height: 1.6; }
+.companion-row .step-disabled { opacity: .4; }

@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "Weculture", "usingComponents": { "post-card": "/components/post-card/index" } }
+{ "navigationStyle": "custom", "enablePullDownRefresh": true, "usingComponents": { "post-card": "/components/post-card/index" } }

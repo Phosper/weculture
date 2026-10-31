@@ -27,11 +27,24 @@ export class AppController {
   @Get('me/favorites') myFavorites(@Req() req: { user: any }) { return this.service.myFavorites(req.user); }
 
   @UseGuards(UserGuard)
+  @Get('users') searchUsers(@Req() req: { user: any }, @Query() query: Record<string, unknown>) { return this.service.searchUsers(req.user, query); }
+  @UseGuards(UserGuard)
+  @Get('users/:id') userProfile(@Req() req: { user: any }, @Param('id') id: string, @Query() query: Record<string, unknown>) { return this.service.getUserProfile(req.user, id, query); }
+  @UseGuards(UserGuard)
+  @Get('users/:id/posts') userPosts(@Req() req: { user: any }, @Param('id') id: string, @Query() query: Record<string, unknown>) { return this.service.getUserPosts(req.user, id, query); }
+
+  @UseGuards(UserGuard)
   @Get('posts') posts(@Req() req: { user: any }, @Query() query: any) { return this.service.listPosts(req.user, query); }
   @UseGuards(UserGuard)
   @Post('posts') createPost(@Req() req: { user: any }, @Body() body: Record<string, unknown>) { return this.service.createPost(req.user, body); }
   @UseGuards(UserGuard)
   @Get('posts/:id') post(@Req() req: { user: any }, @Param('id') id: string) { return this.service.getPost(req.user, id); }
+  @UseGuards(UserGuard)
+  @Get('posts/:id/comments') comments(@Req() req: { user: any }, @Param('id') id: string, @Query() query: Record<string, unknown>) { return this.service.listComments(req.user, id, query); }
+  @UseGuards(UserGuard)
+  @Post('posts/:id/comments') createComment(@Req() req: { user: any }, @Param('id') id: string, @Body() body: unknown) { return this.service.createComment(req.user, id, body); }
+  @UseGuards(UserGuard)
+  @Delete('posts/:id/comments/:commentId') deleteComment(@Req() req: { user: any }, @Param('id') id: string, @Param('commentId') commentId: string) { return this.service.deleteComment(req.user, id, commentId); }
   @UseGuards(UserGuard)
   @Post('posts/:id/likes') like(@Req() req: { user: any }, @Param('id') id: string) { return this.service.toggleLike(req.user, id); }
   @UseGuards(UserGuard)
@@ -47,7 +60,7 @@ export class AppController {
   @UseGuards(UserGuard)
   @Post('travel-routes/recommendations') routeRecommendations(@Req() req: { user: any }, @Body() body: any) { return this.service.listRoutes(req.user, body); }
   @UseGuards(UserGuard)
-  @Post('travel-routes/:id/plans') planRoute(@Req() req: { user: any }, @Param('id') id: string) { return this.service.togglePlan(req.user, id); }
+  @Post('travel-routes/:id/plans') planRoute(@Req() req: { user: any }, @Param('id') id: string, @Body() body: unknown) { return this.service.togglePlan(req.user, id, body); }
   @UseGuards(UserGuard)
   @Post('travel-routes/:id/favorite') favoriteRoute(@Req() req: { user: any }, @Param('id') id: string) { return this.service.toggleFavorite(req.user, 'route', id); }
 
@@ -58,9 +71,21 @@ export class AppController {
 
   @Post('admin/auth/login') adminLogin(@Body() body: { username: string; password: string }) { return this.service.adminLogin(body.username, body.password); }
   @UseGuards(AdminGuard)
+  @Get('admin/me') adminMe(@Req() req: { admin: any }) { return this.service.adminMe(req.admin); }
+  @UseGuards(AdminGuard)
+  @Post('admin/me/password') changeAdminPassword(@Req() req: { admin: any }, @Body() body: { currentPassword?: unknown; newPassword?: unknown }) { return this.service.changeAdminPassword(req.admin, body); }
+  @UseGuards(AdminGuard)
   @Get('admin/dashboard') dashboard(@Req() req: { admin: any }) { return this.service.adminDashboard(req.admin); }
   @UseGuards(AdminGuard)
-  @Get('admin/posts') adminPosts(@Req() req: { admin: any }, @Query('status') status?: string) { return this.service.adminPosts(req.admin, status); }
+  @Get('admin/posts') adminPosts(@Req() req: { admin: any }, @Query() query: any) { return this.service.adminPosts(req.admin, query); }
+  @UseGuards(AdminGuard)
+  @Get('admin/posts/:id/media') adminPostMedia(@Req() req: { admin: any }, @Param('id') id: string) { return this.service.adminPostMedia(req.admin, id); }
+  @UseGuards(AdminGuard)
+  @Get('admin/schools') adminSchools(@Req() req: { admin: any }) { return this.service.adminSchools(req.admin); }
+  @UseGuards(AdminGuard)
+  @Post('admin/posts') createAdminPost(@Req() req: { admin: any }, @Body() body: Record<string, unknown>) { return this.service.saveAdminPost(req.admin, body); }
+  @UseGuards(AdminGuard)
+  @Patch('admin/posts/:id') editAdminPost(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: Record<string, unknown>) { return this.service.saveAdminPost(req.admin, body, id); }
   @UseGuards(AdminGuard)
   @Post('admin/posts/:id/review') reviewPost(@Req() req: { admin: any }, @Param('id') id: string, @Body() body: { status: 'approved' | 'rejected' | 'offline'; reason?: string }) { return this.service.reviewPost(req.admin, id, body.status, body.reason); }
   @UseGuards(AdminGuard)

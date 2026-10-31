@@ -18,3 +18,8 @@ Thumbs.db
 # WeChat development artifacts
 **/.wechat/
 **/miniprogram_npm/
+
+# Local release evidence, inspection captures and preview QR
+.artifacts/
+.inspection/
+weculture-preview-qr.jpg

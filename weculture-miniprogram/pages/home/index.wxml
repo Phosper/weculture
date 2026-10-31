@@ -1,9 +1,31 @@
-<view class="page">
-  <view class="hero"><view><view class="brand">Weculture</view><view class="hero-copy">在校园里，遇见文化与彼此</view></view><view class="avatar">{{avatarText}}</view></view>
-  <view class="search"><input value="{{q}}" placeholder="搜索文化内容、话题" bindinput="searchInput" confirm-type="search" bindconfirm="search"/><text bindtap="search">搜索</text></view>
-  <view wx:if="{{!user.verified}}" class="verify-card card"><view><view class="verify-title">完成校园认证，解锁校内社区</view><view class="subtle">输入学校邀请码后，可发布、报名和查看校内动态</view></view><button class="button-primary compact" bindtap="toVerify">去认证</button></view>
-  <view class="service card" bindtap="toAssistant"><view class="service-mark">C</view><view><view class="service-title">校园小C</view><view class="subtle">活动、课表和校园服务的统一入口</view></view><text>›</text></view>
-  <view class="section-head"><text class="section-title">平台精选</text><text class="more" bindtap="toCommunity">校内社区 ›</text></view>
-  <view wx:if="{{loading}}" class="empty">正在加载内容...</view><view wx:if="{{error}}" class="error">{{error}}</view><post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" />
-  <view wx:if="{{!loading && !error && !posts.length}}" class="empty">{{q ? '没有找到相关内容，试试其他关键词' : '暂无平台精选内容'}}</view>
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="topbar" style="padding-top:{{statusBarHeight}}px;height:{{navBarHeight}}px"><view class="topbar-inner" style="height:{{navContentHeight}}px;padding-right:{{navRightInset}}px"><view class="brand-lockup"><text class="topbar-brand">Weculture</text><text class="brand-subtitle">让文化融入生活</text></view></view></view>
+<view class="page tab-page home">
+  <view class="search-modes"><view class="search-mode {{searchMode === 'content' ? 'selected' : ''}}" data-mode="content" bindtap="changeSearchMode">内容</view><view class="search-mode {{searchMode === 'users' ? 'selected' : ''}}" data-mode="users" bindtap="changeSearchMode">用户</view></view>
+  <view class="search"><text class="search-mark">⌕</text><input id="home-search" focus="{{searchFocused}}" value="{{q}}" maxlength="100" placeholder="{{searchMode === 'users' ? '搜索作者昵称' : '搜索标题、作者昵称或话题'}}" bindinput="searchInput" confirm-type="search" bindconfirm="search"/><text wx:if="{{q || activeSearch}}" class="search-clear" bindtap="clearSearch">清空</text><text class="search-action" bindtap="search">搜索</text></view>
+  <block wx:if="{{searchMode === 'content'}}">
+  <view class="assistant-strip" bindtap="toAssistant"><image class="assistant-mark" src="/assets/assistant-avatar.jpg" mode="aspectFill"/><view class="assistant-copy"><text class="assistant-title">校园小C</text><text class="assistant-description">想找活动、发动态，或者整理资料？</text></view><text class="arrow">›</text></view>
+  <view class="feed-tabs"><view wx:for="{{feeds}}" wx:key="key" class="feed-tab {{feed === item.key ? 'selected' : ''}}" data-feed="{{item.key}}" bindtap="changeFeed">{{item.label}}</view></view>
+  <view class="type-filters"><view wx:for="{{filters}}" wx:key="key" class="type-filter {{type === item.key ? 'selected' : ''}}" data-type="{{item.key}}" bindtap="changeType">{{item.label}}</view></view>
+  <view wx:if="{{type === 'event'}}" class="event-time-panel"><view class="event-time-options"><view wx:for="{{eventTimes}}" wx:key="key" class="event-time-option {{eventTime === item.key ? 'selected' : ''}}" data-event-time="{{item.key}}" bindtap="changeEventTime">{{item.label}}</view></view><text class="event-time-hint">{{eventTime === 'all' ? '选择具体时间，可按北京时间筛选未开始活动；报名状态以详情为准。' : '按北京时间筛选未开始活动；报名状态以详情为准。'}}</text></view>
+  <view class="feed-heading"><text class="section-title">{{activeSearch ? '搜索结果' : feed === 'campus' ? '本校内容' : feed === 'public' ? '公开文化内容' : '最新内容'}}</text><text class="feed-subtitle">{{activeSearch ? '按发布时间排序 · 共 ' + total + ' 条' : feed === 'campus' ? '仅同校认证成员可见' : feed === 'latest' && user.verified ? '公开与本校内容 · 按发布时间排序' : '按发布时间发现文化故事'}}</text></view>
+  <view wx:if="{{feed === 'campus' && user && !user.verified}}" class="feed-empty"><text class="empty-title">认证后查看本校内容</text><text class="empty-description">公开内容仍可浏览，校园圈需要学校认证。</text><button class="button-primary" bindtap="toVerify">去认证</button><button class="button-plain" bindtap="viewLatest">查看最新内容</button></view>
+  <view class="feed-grid"><view class="feed-column"><post-card wx:for="{{leftPosts}}" wx:key="id" post="{{item}}" compact="{{true}}" /></view><view class="feed-column"><post-card wx:for="{{rightPosts}}" wx:key="id" post="{{item}}" compact="{{true}}" /></view></view>
+  <view class="discovery-banner" bindtap="toTravel"><image src="/assets/photo-ancient-architecture.jpg" mode="aspectFill"/><view class="banner-shade"></view><view class="banner-copy"><text class="banner-kicker">文化旅行</text><text class="banner-title">走进有故事的地方</text><text class="banner-link">探索路线　›</text></view></view>
+  <view wx:if="{{!user.verified}}" class="verify-link" bindtap="toVerify">完成校园认证，解锁本校互助与活动报名 ›</view>
+  <view wx:if="{{loading}}" class="empty">{{page ? '正在加载更多…' : '正在加载内容…'}}</view>
+  <view wx:if="{{error}}" class="error">{{error}}<button class="button-plain" bindtap="retry">重新加载</button></view>
+  <view wx:if="{{!loading && !error && user && (feed !== 'campus' || user.verified) && !posts.length}}" class="feed-empty"><text class="empty-title">{{activeSearch ? '没有找到相关内容' : '这里暂时没有内容'}}</text><text class="empty-description">{{activeSearch ? '试试更短的关键词，或切换上方范围与内容类型。' : '审核通过的内容会显示在对应范围。'}}</text><button wx:if="{{activeSearch}}" class="button-plain" bindtap="focusSearch">修改关键词</button><button class="button-primary" bindtap="viewLatest">查看全部最新内容</button></view>
+  <button wx:if="{{!loading && !error && hasMore}}" class="load-more button-plain" bindtap="loadMore">加载更多</button>
+  <view wx:if="{{!loading && !error && posts.length && !hasMore}}" class="feed-end">已显示全部内容</view>
+  </block>
+  <block wx:else>
+    <view class="user-search-heading"><text class="section-title">{{activeSearch ? '用户搜索结果' : '查找作者'}}</text><text class="user-search-hint">按昵称查找有可见作品的作者</text><text wx:if="{{activeSearch && !userError}}" class="feed-subtitle">共 {{userTotal}} 位作者</text></view>
+    <view class="author-list"><view wx:for="{{users}}" wx:key="id" class="author-row" data-id="{{item.id}}" bindtap="openAuthor"><image class="author-avatar" src="{{item.avatarUrl}}" mode="aspectFill"/><view class="author-copy"><text class="author-name">{{item.nickname}}</text><text class="author-work-count">{{item.visiblePostCount}} 条可见作品</text></view><text class="author-enter">›</text></view></view>
+    <view wx:if="{{userLoading}}" class="empty">{{userPage ? '正在加载更多作者…' : '正在查找作者…'}}</view>
+    <view wx:if="{{userError}}" class="error">{{userError}}<button class="button-plain" bindtap="retry">重新加载</button></view>
+    <view wx:if="{{!userLoading && !userError && user && !users.length}}" class="feed-empty"><text class="empty-title">{{activeSearch ? '没有找到相关作者' : '输入昵称，发现文化作者'}}</text><text class="empty-description">{{activeSearch ? '试试更短的昵称。这里只展示有你可见作品的作者。' : '找到作者后，可以进入主页查看其作品。'}}</text><button wx:if="{{activeSearch}}" class="button-plain" bindtap="focusSearch">修改昵称</button></view>
+    <button wx:if="{{!userLoading && !userError && userHasMore}}" class="load-more button-plain" bindtap="loadMore">加载更多作者</button>
+    <view wx:if="{{!userLoading && !userError && users.length && !userHasMore}}" class="feed-end">已显示全部作者</view>
+  </block>
 </view>

@@ -1,0 +1,10 @@
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="topbar" style="padding-top:{{statusBarHeight}}px;height:{{navBarHeight}}px"><view class="topbar-inner" style="height:{{navContentHeight}}px"><view class="brand-lockup"><text class="topbar-brand">Weculture</text><text class="brand-subtitle">让文化融入生活</text></view></view></view>
+<view class="login-page">
+  <image class="login-art" src="/assets/profile-watercolor.jpg" mode="aspectFill" />
+  <view class="login-title">欢迎来到 Weculture</view>
+  <view class="login-description">登录后探索文化故事、社区活动和旅行路线。</view>
+  <button class="button-primary login-button" loading="{{loading}}" bindtap="login">微信登录</button>
+  <view wx:if="{{loading}}" class="loading-hint">正在连接云服务，首次启动可能需要一些时间…</view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+</view>

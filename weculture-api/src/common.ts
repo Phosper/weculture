@@ -2,6 +2,7 @@ import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Injec
 import { randomUUID } from 'crypto';
 import { defer, retry, timer } from 'rxjs';
 import { map } from 'rxjs/operators';
+import { transientDatabaseDisconnect } from './db-retry';
 
 export const ok = <T>(data: T, message = 'ok') => ({ code: 'OK', message, data });
 
@@ -12,9 +13,8 @@ export class RetryTransientReadInterceptor implements NestInterceptor {
     return defer(() => next.handle()).pipe(retry({
       count: 1,
       delay: (error: unknown) => {
-        const failure = error as { code?: string; driverError?: { code?: string } };
-        const code = failure?.driverError?.code || failure?.code;
-        if (code !== 'ECONNRESET' && code !== 'PROTOCOL_CONNECTION_LOST') throw error;
+        const code = transientDatabaseDisconnect(error);
+        if (!code) throw error;
         Logger.warn(`Retrying GET after transient database disconnect (${code})`, RetryTransientReadInterceptor.name);
         return timer(200);
       },

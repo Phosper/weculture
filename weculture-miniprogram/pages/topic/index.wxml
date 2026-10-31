@@ -1,0 +1,17 @@
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="page topic-page">
+  <view class="topic-header"><text class="topic-kicker">WECULTURE · 话题</text><view class="topic-title"># {{tag || '话题'}}</view><text class="topic-description">围绕同一个话题，发现文化与生活。仅展示你有权查看的已发布内容。</text></view>
+  <block wx:if="{{tag}}">
+    <view class="scope-filters"><view wx:for="{{scopes}}" wx:key="key" class="scope-filter {{scope === item.key ? 'selected' : ''}}" data-scope="{{item.key}}" bindtap="changeScope">{{item.label}}</view></view>
+    <view class="type-filters"><view wx:for="{{types}}" wx:key="key" class="type-filter {{type === item.key ? 'selected' : ''}}" data-type="{{item.key}}" bindtap="changeType">{{item.label}}</view></view>
+    <view wx:if="{{type === 'event'}}" class="time-panel"><view class="time-filters"><view wx:for="{{eventTimes}}" wx:key="key" class="time-filter {{eventTime === item.key ? 'selected' : ''}}" data-time="{{item.key}}" bindtap="changeEventTime">{{item.label}}</view></view><text class="time-note">{{eventTime === 'all' ? '全部时间包含历史活动，报名情况以详情为准。' : '按北京时间筛选未开始活动，报名情况以详情为准。'}}</text></view>
+    <view class="results-heading"><text class="section-title">相关内容</text><text class="result-count">{{loading && !page ? '正在查找…' : '共 ' + total + ' 条'}}</text></view>
+    <view wx:if="{{user && scope === 'campus' && !user.verified}}" class="topic-empty"><text class="empty-title">认证后查看本校话题</text><text class="empty-description">公开内容仍可浏览，校园圈需要学校认证。</text><button class="button-primary" bindtap="toVerify">去认证</button><button class="button-plain" bindtap="clearFilters">查看全部可见内容</button></view>
+    <post-card wx:for="{{posts}}" wx:key="id" post="{{item}}" />
+    <view wx:if="{{loading}}" class="empty">{{page ? '正在加载更多…' : '正在加载相关内容…'}}</view>
+    <view wx:if="{{!loading && !error && user && (scope !== 'campus' || user.verified) && !posts.length}}" class="topic-empty"><text class="empty-title">暂时没有匹配内容</text><text class="empty-description">试试放宽范围、内容类型或活动时间。</text><button class="button-primary" bindtap="clearFilters">清除筛选</button><button class="button-plain" bindtap="toDiscover">返回发现</button></view>
+    <button wx:if="{{!loading && !error && hasMore}}" class="button-plain load-more" bindtap="loadMore">加载更多</button>
+    <view wx:if="{{!loading && !error && posts.length && !hasMore}}" class="feed-end">已显示全部相关内容</view>
+  </block>
+  <view wx:if="{{error}}" class="error">{{error}}<button wx:if="{{tag && user}}" class="button-plain" bindtap="retry">重新加载</button><button class="button-plain" bindtap="toDiscover">返回发现</button></view>
+</view>

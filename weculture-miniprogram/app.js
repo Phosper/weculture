@@ -1,21 +1,24 @@
 const { api } = require('./services/api');
-const { getApiBase, getCloudConfig, getEnvironment } = require('./config');
+const { getApiBase, getCloudConfig, getEnvironment, isPhonePreview } = require('./config');
+const { initializeTypography } = require('./utils/typography');
 
 App({
   globalData: { user: null, apiBase: getApiBase(), cloudConfig: getCloudConfig() },
   onLaunch() {
+    initializeTypography(options => wx.loadFontFace(options));
     if (this.globalData.cloudConfig && wx.cloud) wx.cloud.init({ traceUser: true });
   },
   async ensureLogin() {
     const token = wx.getStorageSync('token');
     if (token) {
-      try { const user = await api.get('/me'); this.globalData.user = user; return user; } catch (_) { wx.removeStorageSync('token'); }
+      try { const user = await api.get('/me'); this.globalData.user = user; return user; } catch (error) { if (error.statusCode === 401) wx.removeStorageSync('token'); else throw error; }
     }
     return null;
   },
   async login() {
+    if (this.globalData.cloudConfig) await api.get('/health', false);
     let code;
-    if (getEnvironment() === 'develop') {
+    if (getEnvironment() === 'develop' && !isPhonePreview()) {
       code = wx.getStorageSync('developmentLoginId');
       if (!code) { code = `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`; wx.setStorageSync('developmentLoginId', code); }
     } else {

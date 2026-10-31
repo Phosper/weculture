@@ -1,0 +1,19 @@
+.author-page { padding-top: 28rpx; }
+.author-header { display: flex; align-items: center; gap: 24rpx; padding: 16rpx 0 32rpx; border-bottom: 1rpx solid #E7E5E2; }
+.profile-avatar { display: block; flex-shrink: 0; width: 112rpx; height: 112rpx; border-radius: 50%; }
+.profile-initial { display: flex; align-items: center; justify-content: center; background: #FDE8DD; color: #C5532E; font-size: calc(44rpx * var(--font-scale, 1)); font-weight: 700; }
+.profile-copy { flex: 1; min-width: 0; }
+.profile-name { color: #1C1B1F; font-size: calc(36rpx * var(--font-scale, 1)); font-weight: 700; line-height: 1.45; word-break: break-all; }
+.profile-label { display: block; margin-top: 8rpx; color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); }
+.works-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12rpx; margin: 32rpx 0 12rpx; }
+.works-count { color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.6; }
+.visibility-note { margin-bottom: 26rpx; color: #79747E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.7; }
+.verify-link { display: inline-block; margin: 8rpx 0 0; padding: 0; border: none; border-radius: 0; background: transparent; color: #C5532E; font-size: calc(23rpx * var(--font-scale, 1)); line-height: 1.8; }
+.verify-link::after { border: none; }
+.profile-state { display: flex; flex-direction: column; align-items: center; gap: 16rpx; padding: 46rpx 12rpx; text-align: center; }
+.state-title { color: #1C1B1F; font-size: calc(28rpx * var(--font-scale, 1)); font-weight: 600; }
+.state-description { color: #79747E; font-size: calc(24rpx * var(--font-scale, 1)); line-height: 1.7; }
+.profile-state button,.profile-error button { margin: 14rpx 0 0; max-width: 100%; padding: 0 24rpx; font-size: calc(24rpx * var(--font-scale, 1)); white-space: normal; }
+.profile-error { padding: 30rpx 0; color: #9A362B; font-size: calc(24rpx * var(--font-scale, 1)); line-height: 1.7; word-break: break-all; }
+.load-more { margin: 24rpx auto; font-size: calc(24rpx * var(--font-scale, 1)); }
+.feed-end { padding: 20rpx 0; text-align: center; color: #79747E; font-size: calc(22rpx * var(--font-scale, 1)); }

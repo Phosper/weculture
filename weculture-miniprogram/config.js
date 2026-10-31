@@ -7,6 +7,7 @@ const apiBases = {
 // 手机体验版优先使用微信云托管，避免另外购买服务器和配置 request 合法域名。
 // 创建云托管环境后，只需填写对应环境的 env；service 默认使用 weculture-api。
 const cloudContainers = {
+  develop: { env: 'weculture-test-d4g8lhclj2cb27224', service: 'weculture-api', pathPrefix: '/api/v1' },
   trial: { env: 'weculture-test-d4g8lhclj2cb27224', service: 'weculture-api', pathPrefix: '/api/v1' },
   release: { env: '', service: 'weculture-api', pathPrefix: '/api/v1' }
 };
@@ -19,10 +20,16 @@ function getEnvironment() {
   }
 }
 
+function isPhonePreview() {
+  if (getEnvironment() !== 'develop') return false;
+  try { return wx.getSystemInfoSync().platform !== 'devtools'; }
+  catch (_) { return false; }
+}
+
 function getApiBase() {
   const environment = getEnvironment();
   const extConfig = typeof wx.getExtConfigSync === 'function' ? wx.getExtConfigSync() : {};
-  const apiBase = String(extConfig.apiBase || apiBases[environment] || '').replace(/\/$/, '');
+  const apiBase = String(extConfig.apiBase || (isPhonePreview() ? '' : apiBases[environment]) || '').replace(/\/$/, '');
   if (!apiBase && !getCloudConfig()) throw new Error(`请为小程序 ${environment} 环境配置 API 地址或微信云托管环境`);
   if (apiBase && environment !== 'develop' && !apiBase.startsWith('https://')) throw new Error('体验版和正式版 API 必须使用 HTTPS');
   return apiBase;
@@ -31,7 +38,7 @@ function getApiBase() {
 function getCloudConfig() {
   const environment = getEnvironment();
   const extConfig = typeof wx.getExtConfigSync === 'function' ? wx.getExtConfigSync() : {};
-  const configured = cloudContainers[environment] || {};
+  const configured = environment === 'develop' && !isPhonePreview() ? {} : (cloudContainers[environment] || {});
   const env = String(extConfig.cloudEnv || configured.env || '').trim();
   const service = String(extConfig.cloudService || configured.service || '').trim();
   if (!env || !service) return null;
@@ -42,4 +49,4 @@ function getCloudConfig() {
   };
 }
 
-module.exports = { getApiBase, getCloudConfig, getEnvironment };
+module.exports = { getApiBase, getCloudConfig, getEnvironment, isPhonePreview };

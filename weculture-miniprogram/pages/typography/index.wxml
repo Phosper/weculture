@@ -1,0 +1,24 @@
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="page typography-page">
+  <view class="title">找到舒服的阅读方式</view>
+  <view class="subtle intro">选择字体和大小，用同一句话看清区别。</view>
+  <view class="setting-heading">字体样式</view>
+  <button wx:for="{{fonts}}" wx:key="id" class="font-choice {{draft.font === item.id ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="chooseFont" style="font-family:{{defaultFontFamily}}">
+    <view class="choice-copy"><view class="choice-name">{{item.label}}<text wx:if="{{item.id === 'serif' && serifStatus === 'loading'}}" class="font-badge">加载中</text></view><view class="choice-description">{{item.description}}</view><view class="choice-sample" style="font-family:{{item.family}}">{{item.sample}}</view></view>
+    <text class="selection">{{draft.font === item.id ? '✓' : ''}}</text>
+  </button>
+  <view wx:if="{{serifError}}" class="font-status"><view class="error">{{serifError}}</view><button wx:if="{{serifStatus === 'error'}}" class="retry-font" bindtap="retryFont">重新加载宋体</button></view>
+  <view class="subtle font-note">宋体支持常用中文；少数生僻字会使用默认字体。</view>
+  <view class="setting-heading">字体大小</view>
+  <view class="size-options"><button wx:for="{{sizes}}" wx:key="id" class="size-choice {{draft.size === item.id ? 'selected' : ''}}" data-id="{{item.id}}" bindtap="chooseSize">{{item.label}}</button></view>
+  <view class="comparison card">
+    <view class="comparison-heading" style="font-family:{{defaultFontFamily}}">字体对照</view>
+    <view class="comparison-row" style="font-family:{{defaultFontFamily}}"><view class="comparison-label">默认字体</view><view class="comparison-sample">去看更大的世界，记录文化与生活。</view></view>
+    <view class="comparison-row"><view class="comparison-label" style="font-family:{{defaultFontFamily}}">{{typographyFontReady ? typographySummary : '宋体加载完成后显示预览'}}</view><view class="comparison-sample">去看更大的世界，记录文化与生活。</view></view>
+  </view>
+  <view class="preview card"><view class="preview-label">阅读预览 · {{typographyFontReady ? typographySummary : '暂用默认字体'}}</view><view class="preview-title">去看更大的世界</view><view class="preview-content">从校园里的一杯茶，到城市中的一段故事，记录文化，也发现生活。<text>Weculture · 2026年10月2日 15:03</text></view></view>
+  <view wx:if="{{error}}" class="error">{{error}}</view>
+  <button class="button-primary save" bindtap="save" disabled="{{!typographyFontReady}}">{{draft.font === 'serif' && serifStatus === 'loading' ? '宋体加载中…' : '保存并应用'}}</button>
+  <button class="reset" bindtap="reset">恢复默认预览</button>
+  <view class="subtle save-hint">保存后应用到整个小程序，仅保存在这台手机上。</view>
+</view>

@@ -1,1 +1,46 @@
-<view class="page"><view wx:if="{{loading}}" class="empty">正在加载...</view><view wx:if="{{error}}" class="error">{{error}}</view><block wx:if="{{post}}"><image wx:if="{{post.imageUrl}}" class="cover" src="{{post.imageUrl}}" mode="aspectFill"/><view class="pill">{{post.tag}}</view><view class="title">{{post.title}}</view><view class="meta">{{post.author.nickname}} · {{post.createdAtText}}</view><view class="content">{{post.content}}</view><view wx:if="{{post.event}}" class="event card"><view><view class="event-title">{{post.event.location}}</view><view class="subtle">开始：{{post.event.startsAtText}}</view><view class="subtle">报名截止：{{post.event.registrationDeadlineText}}</view><view class="subtle">{{post.event.registeredCount}} / {{post.event.capacity}} 人已报名</view></view><button class="button-primary event-button" bindtap="register">{{post.event.registered ? '已报名' : '立即报名'}}</button></view><view class="actions"><button class="button-plain" bindtap="like">{{post.liked ? '已点赞' : '点赞'}} {{post.likeCount}}</button><button class="button-plain" bindtap="favorite">{{post.favorited ? '已收藏' : '收藏'}}</button></view></block></view>
+<page-meta page-style="{{fontPageStyle}}" />
+<view class="page detail-page"><view wx:if="{{loading}}" class="empty">正在加载…</view><view wx:if="{{error}}" class="error">{{error}}<button class="button-plain" bindtap="retry">重新加载</button><button wx:if="{{canVerify}}" class="button-plain" bindtap="toVerify">完成学校认证</button></view><block wx:if="{{post}}">
+  <view wx:if="{{post.status !== 'approved'}}" class="review-notice"><view class="review-title">{{post.statusLabel}} · 作者预览</view><view>{{post.statusHint}}</view><view wx:if="{{post.reviewReason}}" class="review-reason">{{post.status === 'rejected' ? '驳回原因' : '下架原因'}}：{{post.reviewReason}}</view></view>
+  <image wx:if="{{post.imageUrl}}" class="cover" src="{{post.imageUrl}}" mode="widthFix" bindtap="previewImage" />
+  <view class="circle-meta">{{post.circleLabel}}</view><view wx:if="{{post.tag}}" class="pill" bindtap="openTopic"># {{post.tag}}<text wx:if="{{post.status === 'approved'}}">　›</text></view><view class="title">{{post.title}}</view>
+  <view class="meta" catchtap="openAuthor"><image wx:if="{{post.author.avatarUrl}}" class="author-avatar" src="{{post.author.avatarUrl}}" mode="aspectFill" /><view wx:else class="author-initial">{{post.author.initial}}</view><view class="author-copy"><text class="author-name">{{post.author.nickname}}</text><text class="subtle">{{post.createdAtText}}</text></view></view>
+  <view class="content">{{post.content}}</view>
+  <view wx:if="{{post.event}}" class="event card">
+    <view class="event-title">活动信息</view>
+    <view class="event-detail"><text>地点</text><text>{{post.event.location}}</text></view>
+    <view class="event-detail"><text>开始</text><text>{{post.event.startsAtText}}</text></view>
+    <view wx:if="{{post.event.endsAtText}}" class="event-detail"><text>结束</text><text>{{post.event.endsAtText}}</text></view>
+    <view class="event-detail"><text>报名截止</text><text>{{post.event.registrationDeadlineText}}</text></view>
+    <view class="event-detail"><text>活动状态</text><text>{{post.event.eventStatusText}}</text></view>
+    <view class="event-detail"><text>已报名</text><text>{{post.event.registeredCount}} / {{post.event.capacity}} 人</text></view>
+    <view wx:if="{{post.event.registered}}" class="registered-note">你已报名，活动已加入我的计划。</view>
+    <button wx:if="{{post.event.cancelable}}" class="button-plain event-button cancel-event" loading="{{eventBusy}}" disabled="{{eventBusy}}" bindtap="cancelRegistration">{{eventBusy ? '正在处理…' : '取消报名'}}</button>
+    <button wx:else class="button-primary event-button" loading="{{eventBusy}}" disabled="{{eventBusy || !post.event.registerable}}" bindtap="register">{{eventBusy ? '正在处理…' : post.event.actionText}}</button>
+    <view wx:if="{{eventError}}" class="event-error">{{eventError}}。可再次点击按钮重试。<button class="button-plain" disabled="{{eventBusy}}" bindtap="retry">重新加载核对状态</button></view>
+  </view>
+  <view wx:if="{{post.status === 'approved'}}" class="actions"><button class="button-plain" bindtap="like">{{post.liked ? '已点赞' : '点赞'}} {{post.likeCount}}</button><button class="button-plain" bindtap="favorite">{{post.favorited ? '已收藏' : '收藏'}}</button><button wx:if="{{canShare}}" class="button-plain" open-type="share">分享</button></view>
+  <view wx:if="{{post.status === 'approved'}}" class="comments-section">
+    <view class="comments-heading"><view><text class="section-title">交流与回应</text><text wx:if="{{commentsReady}}" class="comment-count">{{commentCount}}</text></view><button class="comment-link" disabled="{{commentsLoading || commentsMoreLoading}}" bindtap="refreshComments">刷新</button></view>
+    <view id="comment-composer" class="comment-composer card">
+      <view class="composer-title">{{commentReply ? '写下你的回复' : '分享你的感受'}}</view>
+      <view wx:if="{{commentReply}}" class="reply-target"><text>回复 {{commentReply.nickname}}</text><button class="comment-link" disabled="{{commentBusy}}" bindtap="cancelReply">取消回复</button></view>
+      <textarea class="comment-textarea" value="{{commentContent}}" placeholder="从这段文化故事，聊聊你的发现…" placeholder-class="comment-placeholder" maxlength="500" disabled="{{commentBusy}}" bindinput="commentInput" auto-height="{{true}}" adjust-position="{{true}}" cursor-spacing="100" show-confirm-bar="{{false}}" />
+      <view class="composer-footer"><text class="comment-limit">{{commentLength}} / 500</text><button class="button-primary comment-submit" disabled="{{commentBusy || !commentLength}}" loading="{{commentBusy}}" bindtap="submitComment">{{commentBusy ? '正在发送…' : commentReply ? '发送回复' : '发送评论'}}</button></view>
+      <view wx:if="{{commentError}}" class="comment-error">{{commentError}}</view>
+    </view>
+    <view wx:if="{{commentsLoading}}" class="comments-state">正在加载评论…</view>
+    <view wx:elif="{{commentsReady && !comments.length}}" class="comments-state">还没有评论，来分享你的第一份感受。</view>
+    <view wx:for="{{comments}}" wx:key="id" class="comment-item">
+      <view data-id="{{item.id}}" catchtap="openCommentAuthor"><image wx:if="{{item.author.avatarUrl}}" class="comment-avatar" src="{{item.author.avatarUrl}}" mode="aspectFill" /><view wx:else class="author-initial comment-avatar">{{item.author.initial}}</view></view>
+      <view class="comment-main">
+        <view class="comment-byline"><text class="comment-author" data-id="{{item.id}}" catchtap="openCommentAuthor">{{item.author.nickname}}</text><text wx:if="{{item.isPostAuthor}}" class="comment-author-tag">作者</text></view>
+        <view wx:if="{{item.parent}}" class="comment-parent">回复 {{item.parent.nickname}}<text wx:if="{{item.parent.deleted}}"> · 原评论已删除</text></view>
+        <view class="comment-body {{item.deleted ? 'comment-deleted' : ''}}">{{item.deleted ? '评论已删除' : item.content}}</view>
+        <view class="comment-meta"><text class="comment-date">{{item.createdAtText}}</text><view class="comment-controls"><button wx:if="{{item.canReply}}" class="comment-link" data-id="{{item.id}}" disabled="{{commentBusy}}" bindtap="replyComment">回复</button><button wx:if="{{item.canDelete}}" class="comment-link comment-delete" data-id="{{item.id}}" disabled="{{commentBusy || commentDeleteBusyId}}" bindtap="deleteComment">{{commentDeleteBusyId === item.id ? '处理中…' : '删除'}}</button></view></view>
+      </view>
+    </view>
+    <view wx:if="{{commentsError}}" class="comment-load-error"><view>{{commentsError}}</view><button class="button-plain" bindtap="retryComments">重试加载评论</button></view>
+    <button wx:elif="{{commentsHasMore}}" class="button-plain comment-more" loading="{{commentsMoreLoading}}" disabled="{{commentsMoreLoading}}" bindtap="loadMoreComments">{{commentsMoreLoading ? '正在加载…' : '查看更多评论'}}</button>
+    <view wx:elif="{{commentsReady && comments.length}}" class="comments-end">已展示全部评论</view>
+  </view>
+</block></view>

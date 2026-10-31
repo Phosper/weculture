@@ -1,9 +1,10 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { databaseTimestamp } from './database-timestamp';
 
 abstract class BaseEntity {
   @PrimaryGeneratedColumn('uuid') id!: string;
-  @CreateDateColumn() createdAt!: Date;
-  @UpdateDateColumn() updatedAt!: Date;
+  @CreateDateColumn({ transformer: databaseTimestamp }) createdAt!: Date;
+  @UpdateDateColumn({ transformer: databaseTimestamp }) updatedAt!: Date;
 }
 
 @Entity('schools')
@@ -42,8 +43,14 @@ export class InviteCode extends BaseEntity {
 }
 
 @Entity('posts')
+@Index('IDX_posts_authorId_clientRequestId', ['authorId', 'clientRequestId'], { unique: true })
+@Index('IDX_posts_circle_status_city_createdAt', ['circle', 'status', 'city', 'createdAt'])
+@Index('IDX_posts_circle_schoolId_status_createdAt', ['circle', 'schoolId', 'status', 'createdAt'])
 export class Post extends BaseEntity {
   @Column({ type: 'varchar', nullable: true }) schoolId!: string | null;
+  @Column({ type: 'varchar', length: 20, nullable: true }) circle!: 'city' | 'international' | 'campus' | null;
+  @Column({ type: 'varchar', length: 50, nullable: true }) city!: string | null;
+  @Column({ type: 'varchar', length: 20, nullable: true }) contentLanguage!: string | null;
   @Column() authorId!: string;
   @Column() type!: 'dynamic' | 'event' | 'market';
   @Column({ default: 'school' }) visibility!: 'platform' | 'school';
@@ -55,6 +62,8 @@ export class Post extends BaseEntity {
   @Column({ default: 0 }) likeCount!: number;
   @Column({ default: '' }) rejectionReason!: string;
   @Column({ type: 'varchar', nullable: true }) reviewedBy!: string | null;
+  @Column({ type: 'varchar', length: 80, nullable: true }) clientRequestId!: string | null;
+  @Column({ type: 'varchar', length: 64, nullable: true }) submissionHash!: string | null;
 }
 
 @Entity('events')
@@ -67,6 +76,21 @@ export class Event extends BaseEntity {
   @Column({ default: 30 }) capacity!: number;
   @Column({ default: 0 }) registeredCount!: number;
   @Column({ default: 'active' }) status!: 'active' | 'changed' | 'cancelled';
+}
+
+@Entity('post_comments')
+@Index('IDX_post_comments_request', ['authorId', 'postId', 'clientRequestHash'], { unique: true })
+@Index('IDX_post_comments_post_created', ['postId', 'createdAt', 'id'])
+export class PostComment extends BaseEntity {
+  @Column({ length: 36 }) postId!: string;
+  @Column({ length: 36 }) authorId!: string;
+  @Column({ type: 'varchar', length: 36, nullable: true }) parentId!: string | null;
+  @Column('text') content!: string;
+  @Column({ default: false }) deleted!: boolean;
+  @Column({ length: 80 }) clientRequestId!: string;
+  // Hashing the key makes its identity exact even with MySQL's default collation.
+  @Column({ length: 64 }) clientRequestHash!: string;
+  @Column({ length: 64 }) submissionHash!: string;
 }
 
 @Entity('event_registrations')
@@ -102,7 +126,14 @@ export class TravelRoute extends BaseEntity {
 
 @Entity('user_plans')
 @Index(['userId', 'targetType', 'targetId'], { unique: true })
-export class UserPlan extends BaseEntity { @Column() userId!: string; @Column() targetType!: string; @Column() targetId!: string; @Column({ default: 'active' }) status!: string; }
+export class UserPlan extends BaseEntity {
+  @Column() userId!: string;
+  @Column() targetType!: string;
+  @Column() targetId!: string;
+  @Column({ default: 'active' }) status!: string;
+  @Column({ type: 'varchar', length: 10, nullable: true }) departDate!: string | null;
+  @Column({ type: 'int', nullable: true }) companions!: number | null;
+}
 
 @Entity('assistant_knowledge')
 export class AssistantKnowledge extends BaseEntity {
@@ -141,4 +172,4 @@ export class AuditLog extends BaseEntity {
   @Column('text') detail!: string;
 }
 
-export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog];
+export const ENTITIES = [School, User, SchoolMembership, InviteCode, Post, PostComment, Event, EventRegistration, Like, Favorite, TravelRoute, UserPlan, AssistantKnowledge, AssistantMessage, AdminAccount, AuditLog];
