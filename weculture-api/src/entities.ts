@@ -58,6 +58,8 @@ export class Post extends BaseEntity {
   @Column() title!: string;
   @Column('text') content!: string;
   @Column({ default: '' }) imageUrl!: string;
+  @Column({ type: 'text', nullable: true }) imageUrls!: string | null;
+  @Column({ default: 0 }) coverIndex!: number;
   @Column({ default: '' }) tag!: string;
   @Column({ default: 0 }) likeCount!: number;
   @Column({ default: '' }) rejectionReason!: string;

@@ -9,7 +9,7 @@ const pad = (value) => String(value).padStart(2, '0');
 const datePart = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 const timePart = (date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
 Page(withTypography({
-  data: { ...getNavMetrics(), automaticCityLocationEnabled: FEATURES.automaticCityLocation, user: null, circle: 'campus', circles: CIRCLES, city: '', cityRegion: [], locating: false, locationError: '', locationSettings: false, contentLanguage: 'zh', languageIndex: 0, languages: CONTENT_LANGUAGES, type: 'dynamic', title: '', content: '', tag: '', price: '', location: '', startDate: '', startTime: '', endDate: '', endTime: '', deadlineDate: '', deadlineTime: '', capacity: 30, imageTempPath: '', error: '', submitting: false, draftRestored: false },
+  data: { ...getNavMetrics(), automaticCityLocationEnabled: FEATURES.automaticCityLocation, user: null, circle: 'campus', circles: CIRCLES, city: '', cityRegion: [], locating: false, locationError: '', locationSettings: false, contentLanguage: 'zh', languageIndex: 0, languages: CONTENT_LANGUAGES, type: 'dynamic', title: '', content: '', tag: '', price: '', location: '', startDate: '', startTime: '', endDate: '', endTime: '', deadlineDate: '', deadlineTime: '', capacity: 30, imageTempPath: '', imageTempPaths: [], coverIndex: 0, error: '', submitting: false, draftRestored: false },
   onLoad() { const start = new Date(Date.now() + 24 * 60 * 60 * 1000); start.setHours(9, 0, 0, 0); const end = new Date(start.getTime() + 3 * 60 * 60 * 1000); const deadline = new Date(start.getTime() - 2 * 60 * 60 * 1000); this.setData({ startDate: datePart(start), startTime: timePart(start), endDate: datePart(end), endTime: timePart(end), deadlineDate: datePart(deadline), deadlineTime: timePart(deadline) }); },
   async onShow() {
     selectTab(this, 2);
@@ -79,8 +79,34 @@ Page(withTypography({
   selectType(e) { if (!this.data.submitting) { this.setData({ type: e.currentTarget.dataset.type }); this.saveDraft(); } },
   input(e) { if (this.data.submitting) return; this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); this.saveDraft(); },
   pick(e) { if (this.data.submitting) return; this.setData({ [e.currentTarget.dataset.field]: e.detail.value }); this.saveDraft(); },
-  chooseImage() { if (this.data.submitting) return; wx.chooseMedia({ count: 1, mediaType: ['image'], sourceType: ['album', 'camera'], success: (result) => { if (!this.data.submitting && result.tempFiles && result.tempFiles[0]) this.setData({ imageTempPath: result.tempFiles[0].tempFilePath }); } }); },
-  removeImage() { if (!this.data.submitting) this.setData({ imageTempPath: '' }); },
+  chooseImage() {
+    if (this.data.submitting) return;
+    const remaining = 9 - this.data.imageTempPaths.length;
+    if (remaining <= 0) { wx.showToast({ title: '最多选择9张图片', icon: 'none' }); return; }
+    wx.chooseMedia({ count: remaining, mediaType: ['image'], sourceType: ['album', 'camera'], success: (result) => {
+      if (this.data.submitting) return;
+      const added = (result.tempFiles || []).map(file => file.tempFilePath).filter(Boolean).slice(0, remaining);
+      if (!added.length) return;
+      const imageTempPaths = this.data.imageTempPaths.concat(added);
+      const coverIndex = Math.min(this.data.coverIndex, imageTempPaths.length - 1);
+      this.setData({ imageTempPaths, coverIndex, imageTempPath: imageTempPaths[coverIndex] || '' });
+    } });
+  },
+  removeImage(event) {
+    if (this.data.submitting) return;
+    const rawIndex = event && event.currentTarget && event.currentTarget.dataset ? event.currentTarget.dataset.index : undefined;
+    const imageTempPaths = this.data.imageTempPaths.slice();
+    if (rawIndex === undefined) imageTempPaths.length = 0;
+    else if (Number.isInteger(Number(rawIndex)) && imageTempPaths[Number(rawIndex)]) imageTempPaths.splice(Number(rawIndex), 1);
+    const coverIndex = imageTempPaths.length ? Math.min(this.data.coverIndex, imageTempPaths.length - 1) : 0;
+    this.setData({ imageTempPaths, coverIndex, imageTempPath: imageTempPaths[coverIndex] || '' });
+  },
+  setCover(event) {
+    if (this.data.submitting) return;
+    const index = Number(event.currentTarget.dataset.index);
+    if (!Number.isInteger(index) || index < 0 || index >= this.data.imageTempPaths.length) return;
+    this.setData({ coverIndex: index, imageTempPath: this.data.imageTempPaths[index] });
+  },
   async uploadImage(imageTempPath) {
     if (!imageTempPath) return '';
     if (!getApp().globalData.cloudConfig || !wx.cloud || typeof wx.cloud.uploadFile !== 'function') throw new Error('当前环境尚未配置图片存储，请移除图片后提交');
@@ -88,6 +114,11 @@ Page(withTypography({
     const result = await new Promise((resolve, reject) => wx.cloud.uploadFile({ cloudPath, filePath: imageTempPath, success: resolve, fail: () => reject(new Error('图片上传失败，请检查网络后重试')) }));
     if (!result.fileID) throw new Error('图片上传未完成，请重试');
     return result.fileID;
+  },
+  async uploadImages(imageTempPaths) {
+    const imageUrls = [];
+    for (const imageTempPath of imageTempPaths) imageUrls.push(await this.uploadImage(imageTempPath));
+    return imageUrls;
   },
   async submit() {
     if (this.data.submitting || this.data.locating) return;
@@ -98,26 +129,31 @@ Page(withTypography({
       if (!user) throw new Error('请先登录');
       if (this.data.circle === 'campus' && !user.verified) throw new Error('发布校园圈内容前，请先完成学校认证');
       const data = submissionData(this.data);
-      const imageTempPath = this.data.imageTempPath;
+      const imageTempPaths = this.data.imageTempPaths.length ? this.data.imageTempPaths.slice() : (this.data.imageTempPath ? [this.data.imageTempPath] : []);
+      const coverIndex = imageTempPaths.length ? Math.min(this.data.coverIndex, imageTempPaths.length - 1) : 0;
       const storageKey = `postSubmission:${user.id}`;
-      const fingerprint = JSON.stringify({ ...data, imageTempPath });
+      const fingerprint = JSON.stringify({ ...data, imageTempPaths });
       let attempt = wx.getStorageSync(storageKey);
       if (!attempt || attempt.fingerprint !== fingerprint) {
         attempt = { fingerprint, clientRequestId: `post_${Date.now()}_${Math.random().toString(36).slice(2, 12)}` };
         wx.setStorageSync(storageKey, attempt);
       }
-      if (attempt.imageUrl === undefined) {
-        attempt.imageUrl = await this.uploadImage(imageTempPath);
+      if (!Array.isArray(attempt.imageUrls)) {
+        attempt.imageUrls = await this.uploadImages(imageTempPaths);
+        attempt.coverIndex = coverIndex;
+        attempt.imageUrl = attempt.imageUrls[coverIndex] || '';
         wx.setStorageSync(storageKey, attempt);
       }
-      const result = await api.post('/posts', { ...data, imageUrl: attempt.imageUrl, clientRequestId: attempt.clientRequestId });
+      const imageUrls = attempt.imageUrls || (attempt.imageUrl ? [attempt.imageUrl] : []);
+      const attemptCoverIndex = Number.isInteger(attempt.coverIndex) && imageUrls.length ? Math.min(attempt.coverIndex, imageUrls.length - 1) : 0;
+      const result = await api.post('/posts', { ...data, imageUrl: imageUrls[attemptCoverIndex] || '', imageUrls, coverIndex: attemptCoverIndex, clientRequestId: attempt.clientRequestId });
       if (!result || !result.id || !['pending', 'approved', 'rejected', 'offline'].includes(result.status)) throw new Error('暂未确认投稿结果，请重试或到“我的投稿”查看');
       wx.removeStorageSync(storageKey);
       clearStoredDraft(wx, user.id);
       this.publishedResult = result;
       this.publishedCircle = { circle: result.circle || data.circle, city: result.city || data.city || '' };
       if (data.circle === 'city') { try { saveCity(data.city, this.data.cityRegion); } catch (_) {} }
-      this.setData({ title: '', content: '', tag: '', price: '', location: '', imageTempPath: '', draftRestored: false });
+      this.setData({ title: '', content: '', tag: '', price: '', location: '', imageTempPath: '', imageTempPaths: [], coverIndex: 0, draftRestored: false });
       this.showResult(result);
     } catch (error) { this.setData({ error: error.message || '提交失败，请检查网络后重试', submitting: false }); this.saveDraft(); }
   },

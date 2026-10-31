@@ -60,11 +60,19 @@ function formatEvent(event, postStatus = 'approved') {
 function formatPost(post) {
   if (!post) return post;
   const legacyDemo = post.circle == null && post.visibility === 'platform' && !post.schoolId;
+  const fallbackImage = resolveMedia(post.imageUrl, legacyDemo ? post.title : undefined);
+  const imageUrls = Array.isArray(post.imageUrls) && post.imageUrls.length
+    ? post.imageUrls.map((value) => resolveMedia(value))
+    : (fallbackImage ? [fallbackImage] : []);
+  const coverIndex = Number.isInteger(post.coverIndex) && post.coverIndex >= 0 && post.coverIndex < imageUrls.length ? post.coverIndex : 0;
   return {
     ...post,
     ...reviewInfo(post),
     circleLabel: circleLabel(post),
-    imageUrl: resolveMedia(post.imageUrl, legacyDemo ? post.title : undefined),
+    imageUrl: imageUrls[coverIndex] || '',
+    imageUrls,
+    coverIndex,
+    coverUrl: imageUrls[coverIndex] || '',
     communityImageUrl: legacyDemo && post.title === '沉浸式体验非遗：我们在校园里办了一场茶艺社！' ? '/assets/community-tea.jpg' : '',
     collageImages: legacyDemo && post.title === '沉浸式体验非遗：我们在校园里办了一场茶艺社！' ? ['/assets/home-tea.jpg', '/assets/community-cups.jpg'] : null,
     createdAtText: formatDateTime(post.createdAt),

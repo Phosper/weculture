@@ -11,6 +11,7 @@ import { FeaturedPosts1793000001000 } from '../src/migrations/1793000001000-Feat
 import { AnalyticsEvents1793000002000 } from '../src/migrations/1793000002000-AnalyticsEvents';
 import { EventChanges1793000003000 } from '../src/migrations/1793000003000-EventChanges';
 import { FollowsNotifications1793000004000 } from '../src/migrations/1793000004000-FollowsNotifications';
+import { PostImages1793000005000 } from '../src/migrations/1793000005000-PostImages';
 
 const migrations = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000, ContentReports1793000000000, FeaturedPosts1793000001000, AnalyticsEvents1793000002000, EventChanges1793000003000, FollowsNotifications1793000004000];
 const follow = { followerId: 'user-a', targetType: 'user' as const, targetId: 'user-b' };
@@ -85,7 +86,7 @@ describe('Follows and notifications migration', () => {
     try {
       for (const type of ['mysql', 'sqljs']) {
         process.env.NODE_ENV = 'development'; process.env.DB_TYPE = type;
-        expect(createDataSourceOptions().migrations).toEqual(migrations);
+        expect(createDataSourceOptions().migrations).toEqual([...migrations, PostImages1793000005000]);
       }
     } finally {
       for (const [key, value] of Object.entries(previous)) if (value === undefined) delete process.env[key]; else process.env[key] = value;

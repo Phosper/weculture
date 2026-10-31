@@ -290,6 +290,12 @@ Page(withTypography({
     const url = this.data.post && this.data.post.imageUrl;
     if (url) wx.previewImage({ current: url, urls: [url] });
   },
+  previewGallery(event) {
+    const post = this.data.post;
+    const index = Number(event.currentTarget.dataset.index);
+    if (!post || !Array.isArray(post.imageUrls) || !post.imageUrls[index]) return;
+    wx.previewImage({ current: post.imageUrls[index], urls: post.imageUrls });
+  },
   async like() {
     if (!this.data.post || this.data.post.status !== 'approved') return;
     try { const result = await api.post(`/posts/${this.data.post.id}/likes`, {}); this.setData({ 'post.liked': result.liked, 'post.likeCount': result.likeCount }); }

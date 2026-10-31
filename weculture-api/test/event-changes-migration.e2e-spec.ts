@@ -11,6 +11,7 @@ import { FeaturedPosts1793000001000 } from '../src/migrations/1793000001000-Feat
 import { AnalyticsEvents1793000002000 } from '../src/migrations/1793000002000-AnalyticsEvents';
 import { EventChanges1793000003000 } from '../src/migrations/1793000003000-EventChanges';
 import { FollowsNotifications1793000004000 } from '../src/migrations/1793000004000-FollowsNotifications';
+import { PostImages1793000005000 } from '../src/migrations/1793000005000-PostImages';
 
 const migrations = [InitialSchema1789560000000, PostSubmissionIdentity1790899200000, PostCircles1791417600000, RoutePlanDetails1792454400000, PostComments1792458000000, ContentReports1793000000000, FeaturedPosts1793000001000, AnalyticsEvents1793000002000, EventChanges1793000003000];
 
@@ -19,6 +20,7 @@ describe('Event changes migration', () => {
     const source = await new DataSource({ type: 'sqljs', entities: ENTITIES, migrations }).initialize(), runner = source.createQueryRunner();
     try {
       await source.runMigrations();
+      await new PostImages1793000005000().up(runner);
       const post = await source.getRepository(Post).save({ authorId: 'author-a', type: 'event', status: 'approved', visibility: 'platform', circle: 'city', city: '北京', title: '迁移活动', content: '迁移正文' });
       const event = await source.getRepository(Event).save({ postId: post.id, startsAt: new Date(Date.now() + 86400000), endsAt: new Date(Date.now() + 90000000), registrationDeadline: new Date(Date.now() + 80000000), location: '原地点', capacity: 10 });
       expect(event).toMatchObject({ changeNote: '', changedAt: null, cancellationReason: '' });
@@ -70,7 +72,7 @@ describe('Event changes migration', () => {
     try {
       for (const type of ['mysql', 'sqljs']) {
         process.env.NODE_ENV = 'development'; process.env.DB_TYPE = type;
-        expect(createDataSourceOptions().migrations).toEqual([...migrations, FollowsNotifications1793000004000]);
+        expect(createDataSourceOptions().migrations).toEqual([...migrations, FollowsNotifications1793000004000, PostImages1793000005000]);
       }
     } finally {
       for (const [key, value] of Object.entries(previous)) if (value === undefined) delete process.env[key]; else process.env[key] = value;

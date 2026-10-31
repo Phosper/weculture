@@ -263,9 +263,34 @@ export class AppService implements OnModuleInit {
     const title = String(data.title || '').trim(), content = String(data.content || '').trim(), type = String(data.type || 'dynamic') as Post['type'];
     if (!['dynamic', 'event', 'market'].includes(type) || title.length < 2 || title.length > 40 || content.length < 2 || content.length > 2000) throw new BadRequestException('请填写有效的标题和正文');
     const tag = String(data.tag || (type === 'event' ? (circle === 'campus' ? '校内活动' : '文化活动') : type === 'market' ? (circle === 'campus' ? '校园闲置' : '闲置交流') : (circle === 'campus' ? '校园动态' : '文化分享'))).trim();
-    const imageUrl = String(data.imageUrl || '');
+    let imageUrls: string[] = [];
+    if (data.imageUrls !== undefined) {
+      if (!Array.isArray(data.imageUrls) || data.imageUrls.length > 9) throw new BadRequestException('图片最多9张');
+      imageUrls = data.imageUrls.map((value) => {
+        if (typeof value !== 'string') throw new BadRequestException('图片地址无效');
+        const image = value.trim();
+        if (!image || image.length > 2048 || /[\u0000-\u001f\u007f]/.test(image)) throw new BadRequestException('图片地址无效');
+        return image;
+      });
+    } else {
+      const single = String(data.imageUrl || '').trim();
+      if (single) imageUrls = [single];
+    }
+    const coverValue = data.coverIndex === undefined ? 0 : data.coverIndex;
+    if (typeof coverValue !== 'number' || !Number.isInteger(coverValue) || coverValue < 0 || (imageUrls.length ? coverValue >= imageUrls.length : coverValue !== 0)) throw new BadRequestException('封面序号无效');
+    const coverIndex = coverValue;
+    const imageUrl = imageUrls[coverIndex] || '';
     if (tag.length > 80 || imageUrl.length > 2048) throw new BadRequestException('标签或图片地址过长');
-    return { type, title, content, tag, imageUrl };
+    return { type, title, content, tag, imageUrl, imageUrls, coverIndex };
+  }
+  private postImages(post: Post) {
+    if (post.imageUrls) {
+      try {
+        const parsed = JSON.parse(post.imageUrls);
+        if (Array.isArray(parsed)) return parsed.filter((value): value is string => typeof value === 'string' && value.length > 0).slice(0, 9);
+      } catch (_) {}
+    }
+    return post.imageUrl ? [post.imageUrl] : [];
   }
   private eventContent(data: Record<string, unknown>, previous?: Event | null) {
     const merged = previous ? { ...previous, ...data } : data;
@@ -697,7 +722,10 @@ export class AppService implements OnModuleInit {
     const [author, liked, favorited, event] = await Promise.all([this.users.findOneBy({ id: post.authorId }), this.likes.existsBy({ userId, postId: post.id }), this.favorites.existsBy({ userId, targetType: 'post', targetId: post.id }), post.type === 'event' ? this.events.findOneBy({ postId: post.id }) : Promise.resolve(null)]);
     const registration = event ? await this.registrations.findOneBy({ eventId: event.id, userId, status: 'registered' }) : null;
     const { clientRequestId, submissionHash, ...publicPost } = post;
-    return { ...publicPost, author: author ? { id: author.id, nickname: author.nickname || 'Weculture 用户', avatarUrl: author.avatarUrl, profileAvailable: author.status === 'active' } : { id: post.authorId, nickname: 'Weculture', avatarUrl: '', profileAvailable: false }, liked, favorited, canReport: post.status === 'approved' && post.authorId !== userId, event: event ? { ...event, registered: Boolean(registration) } : null };
+    const imageUrls = this.postImages(post);
+    const coverIndex = Number.isInteger(post.coverIndex) && post.coverIndex >= 0 && post.coverIndex < imageUrls.length ? post.coverIndex : 0;
+    const coverUrl = imageUrls[coverIndex] || post.imageUrl || '';
+    return { ...publicPost, imageUrl: coverUrl, imageUrls, coverIndex, coverUrl, author: author ? { id: author.id, nickname: author.nickname || 'Weculture 用户', avatarUrl: author.avatarUrl, profileAvailable: author.status === 'active' } : { id: post.authorId, nickname: 'Weculture', avatarUrl: '', profileAvailable: false }, liked, favorited, canReport: post.status === 'approved' && post.authorId !== userId, event: event ? { ...event, registered: Boolean(registration) } : null };
   }
 
   async createPost(session: UserSession, data: Record<string, unknown>) {
@@ -716,10 +744,11 @@ export class AppService implements OnModuleInit {
     const member = metadata.circle === 'campus' ? await this.verifiedMembership(session.id) : null;
     if (data.schoolId && data.schoolId !== member?.schoolId) throw new ForbiddenException('无权发布其他学校内容');
     const schoolId = member?.schoolId || null;
-    const { type, title, content, tag, imageUrl } = this.postContent(data, metadata.circle);
+    const { type, title, content, tag, imageUrl, imageUrls, coverIndex } = this.postContent(data, metadata.circle);
     const clientRequestId = data.clientRequestId === undefined ? null : String(data.clientRequestId);
     if (clientRequestId !== null && !/^[A-Za-z0-9_-]{8,80}$/.test(clientRequestId)) throw new BadRequestException('投稿请求标识无效');
     const submissionPayload = { schoolId, type, title, content, tag, imageUrl,
+      ...(data.imageUrls !== undefined ? { imageUrls, coverIndex } : {}),
       ...(type === 'event' ? { location: String(data.location || '').trim(), startsAt: String(data.startsAt), endsAt: String(data.endsAt), registrationDeadline: String(data.registrationDeadline), capacity: Number(data.capacity) } : {}),
     };
     const submissionHash = createHash('sha256').update(JSON.stringify({ ...submissionPayload, circle: metadata.circle, city: metadata.city, contentLanguage: metadata.contentLanguage })).digest('hex');
@@ -738,7 +767,7 @@ export class AppService implements OnModuleInit {
     if (type === 'event') eventData = this.eventContent(data);
     try {
       const post = await this.dataSource.transaction(async (manager) => {
-        const created = await manager.save(Post, manager.create(Post, { ...metadata, schoolId, authorId: session.id, type, status: metadata.circle === 'campus' && process.env.AUTO_APPROVE === 'true' ? 'approved' : 'pending', title, content, tag, imageUrl, clientRequestId, submissionHash }));
+        const created = await manager.save(Post, manager.create(Post, { ...metadata, schoolId, authorId: session.id, type, status: metadata.circle === 'campus' && process.env.AUTO_APPROVE === 'true' ? 'approved' : 'pending', title, content, tag, imageUrl, imageUrls: JSON.stringify(imageUrls), coverIndex, clientRequestId, submissionHash }));
         if (eventData) await manager.save(Event, manager.create(Event, { postId: created.id, ...eventData }));
         return created;
       });
@@ -978,7 +1007,10 @@ export class AppService implements OnModuleInit {
   private async decorateAdminPost(post: Post) {
     const { clientRequestId, submissionHash, ...content } = post;
     const [event, school] = await Promise.all([post.type === 'event' ? this.events.findOneBy({ postId: post.id }) : Promise.resolve(null), post.schoolId ? this.schools.findOneBy({ id: post.schoolId }) : Promise.resolve(null)]);
-    return { ...content, event, school: school ? { id: school.id, name: school.name, shortName: school.shortName } : null };
+    const imageUrls = this.postImages(post);
+    const coverIndex = Number.isInteger(post.coverIndex) && post.coverIndex >= 0 && post.coverIndex < imageUrls.length ? post.coverIndex : 0;
+    const coverUrl = imageUrls[coverIndex] || post.imageUrl || '';
+    return { ...content, imageUrl: coverUrl, imageUrls, coverIndex, coverUrl, event, school: school ? { id: school.id, name: school.name, shortName: school.shortName } : null };
   }
   async adminDashboard(session: AdminSession) {
     const admin = await this.activeAdmin(session);
@@ -1028,7 +1060,19 @@ export class AppService implements OnModuleInit {
     const schoolId = metadata.circle === 'campus' ? String(merged.schoolId || admin.schoolId || '') : null;
     this.ensureAdminPostScope(admin, { ...metadata, schoolId });
     if (metadata.circle === 'campus' && (!schoolId || !await this.schools.existsBy({ id: schoolId, status: 'active' }))) throw new BadRequestException('请选择有效的学校');
-    const core = this.postContent(merged, metadata.circle);
+    const contentSource = { ...merged };
+    if (data.imageUrls === undefined) {
+      if (data.imageUrl === undefined) {
+        contentSource.imageUrls = previous ? this.postImages(previous) : [];
+        contentSource.coverIndex = previous?.coverIndex || 0;
+      } else {
+        delete contentSource.imageUrls;
+        delete contentSource.coverIndex;
+      }
+    } else if (data.coverIndex === undefined) {
+      contentSource.coverIndex = 0;
+    }
+    const core = this.postContent(contentSource, metadata.circle);
     if (previous && previous.type !== core.type) throw new BadRequestException('编辑时不能更改内容类型');
     const status = data.status === undefined ? (previous?.status || 'approved') : String(data.status);
     if (!['pending', 'approved', 'offline'].includes(status)) throw new BadRequestException('请选择待审核、已发布或已下架状态');
@@ -1041,7 +1085,7 @@ export class AppService implements OnModuleInit {
       }
       // Revalidate against the locked, current count and retain the latest omitted fields.
       const eventData = core.type === 'event' ? this.eventContent(data, currentEvent) : null;
-      const post = await manager.save(Post, manager.create(Post, { ...(previous || {}), ...metadata, ...core, schoolId, authorId: previous?.authorId || admin.id, status: status as Post['status'], rejectionReason: '', reviewedBy: status === 'pending' ? null : admin.id }));
+      const post = await manager.save(Post, manager.create(Post, { ...(previous || {}), ...metadata, ...core, imageUrls: JSON.stringify(core.imageUrls), schoolId, authorId: previous?.authorId || admin.id, status: status as Post['status'], rejectionReason: '', reviewedBy: status === 'pending' ? null : admin.id }));
       if (eventData) {
         if (currentEvent) await manager.update(Event, currentEvent.id, eventData);
         else await manager.save(Event, manager.create(Event, { ...eventData, postId: post.id }));

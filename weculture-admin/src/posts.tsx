@@ -8,8 +8,8 @@ type Circle = 'city' | 'international' | 'campus';
 type PostType = 'dynamic' | 'event' | 'market';
 type School = { id: string; name: string; shortName: string };
 type EventInfo = { location: string; startsAt: string; endsAt: string; registrationDeadline: string; capacity: number; registeredCount: number; status: 'active' | 'changed' | 'cancelled'; changeNote: string; cancellationReason: string; changedAt?: string | null };
-type Post = { id: string; title: string; content: string; type: PostType; circle: Circle | null; city: string | null; contentLanguage: string | null; schoolId: string | null; visibility: 'school' | 'platform'; status: string; createdAt: string; rejectionReason: string; imageUrl: string; tag: string; event?: EventInfo | null };
-type PostValues = { title: string; content: string; type: PostType; circle: Circle; city?: string; contentLanguage?: string; schoolId?: string; imageUrl?: string; tag?: string; location?: string; startsAt?: string; endsAt?: string; registrationDeadline?: string; capacity?: number; eventStatus?: 'active' | 'changed' | 'cancelled'; changeNote?: string; cancellationReason?: string };
+type Post = { id: string; title: string; content: string; type: PostType; circle: Circle | null; city: string | null; contentLanguage: string | null; schoolId: string | null; visibility: 'school' | 'platform'; status: string; createdAt: string; rejectionReason: string; imageUrl: string; imageUrls?: string[]; coverIndex?: number; coverUrl?: string; tag: string; event?: EventInfo | null };
+type PostValues = { title: string; content: string; type: PostType; circle: Circle; city?: string; contentLanguage?: string; schoolId?: string; imageUrlsText?: string; coverIndex?: number; tag?: string; location?: string; startsAt?: string; endsAt?: string; registrationDeadline?: string; capacity?: number; eventStatus?: 'active' | 'changed' | 'cancelled'; changeNote?: string; cancellationReason?: string };
 type ReviewMedia = { postId: string; request: number; url: string; status: 'idle' | 'fetching' | 'loading' | 'ready' | 'error'; error: string };
 const circles = [{ value: 'city', label: '同城圈' }, { value: 'international', label: '国际圈' }, { value: 'campus', label: '校园圈' }];
 const languages = [{ value: 'zh', label: '中文' }, { value: 'en', label: '英语' }, { value: 'ru', label: '俄语' }, { value: 'fr', label: '法语' }, { value: 'es', label: '西班牙语' }, { value: 'ar', label: '阿拉伯语' }, { value: 'other', label: '其他语言' }];
@@ -124,7 +124,7 @@ export function Posts({ admin }: { admin: Admin }) {
     form.setFieldsValue(post ? {
       title: post.title, content: post.content, type: post.type, circle: post.circle || undefined,
       city: post.city || undefined, contentLanguage: post.contentLanguage || undefined,
-      schoolId: post.schoolId || undefined, tag: post.tag, imageUrl: post.imageUrl,
+      schoolId: post.schoolId || undefined, tag: post.tag, imageUrlsText: (post.imageUrls && post.imageUrls.length ? post.imageUrls : post.imageUrl ? [post.imageUrl] : []).join('\n'), coverIndex: post.coverIndex || 0,
       location: post.event?.location, startsAt: localDateTime(post.event?.startsAt), endsAt: localDateTime(post.event?.endsAt),
       registrationDeadline: localDateTime(post.event?.registrationDeadline), capacity: post.event?.capacity,
       eventStatus: post.event?.status || 'active', changeNote: post.event?.changeNote || '', cancellationReason: post.event?.cancellationReason || '',
@@ -135,7 +135,14 @@ export function Posts({ admin }: { admin: Admin }) {
   const submit = async (values: PostValues) => {
     if (!canWrite || saving || (editing && !allowed(editing))) return;
     if (!platformAdmin && values.circle !== 'campus') { message.error('学校运营员只能发布本校校园圈内容'); return; }
-    const payload: Record<string, unknown> = { title: values.title.trim(), content: values.content.trim(), type: values.type, circle: values.circle, status: 'pending', tag: values.tag?.trim() || '', imageUrl: values.imageUrl?.trim() || '' };
+    const payload: Record<string, unknown> = { title: values.title.trim(), content: values.content.trim(), type: values.type, circle: values.circle, status: 'pending', tag: values.tag?.trim() || '' };
+    const imageUrls = (values.imageUrlsText || '').split('\n').map((value) => value.trim()).filter(Boolean);
+    if (imageUrls.length > 9) { message.warning('图片最多9张'); return; }
+    const coverIndex = values.coverIndex === undefined ? 0 : Number(values.coverIndex);
+    if (!Number.isInteger(coverIndex) || coverIndex < 0 || (imageUrls.length ? coverIndex >= imageUrls.length : coverIndex !== 0)) { message.warning('封面序号无效'); return; }
+    payload.imageUrls = imageUrls;
+    payload.coverIndex = coverIndex;
+    payload.imageUrl = imageUrls[coverIndex] || '';
     if (values.circle === 'city') payload.city = values.city?.trim();
     if (values.circle === 'international') payload.contentLanguage = values.contentLanguage;
     if (values.circle === 'campus') payload.schoolId = platformAdmin ? values.schoolId : admin.schoolId;
@@ -192,6 +199,7 @@ export function Posts({ admin }: { admin: Admin }) {
         {(!mediaIsCurrent || ['idle', 'fetching', 'loading'].includes(media.status)) && <Alert className="review-note" type="info" showIcon message="正在加载投稿配图…" description="配图显示完整后才可审核通过。" />}
         {mediaIsCurrent && media.status === 'error' && <Alert className="review-note" type="warning" showIcon message="配图暂不可读取" description={media.error} action={<Button onClick={() => void loadMedia(selected)}>重试配图</Button>} />}
       </>}
+      {selected && <Typography.Paragraph type="secondary">共 {selected.imageUrls?.length || (selected.imageUrl ? 1 : 0)} 张图，封面第 {Number(selected.coverIndex || 0) + 1} 张；当前后台只预览封面，其他图片按地址保存。</Typography.Paragraph>}
       <Typography.Paragraph className="review-content">{selected?.content}</Typography.Paragraph>
       {selected?.tag && <Tag>{selected.tag}</Tag>}
       {selected?.event && <Descriptions size="small" column={1} items={[{ key: 'location', label: '活动地点', children: selected.event.location }, { key: 'startsAt', label: '活动开始', children: new Date(selected.event.startsAt).toLocaleString() }, { key: 'endsAt', label: '活动结束', children: new Date(selected.event.endsAt).toLocaleString() }, { key: 'deadline', label: '报名截止', children: new Date(selected.event.registrationDeadline).toLocaleString() }, { key: 'capacity', label: '已报名 / 名额', children: `${selected.event.registeredCount} / ${selected.event.capacity}` }]} />}
@@ -211,7 +219,8 @@ export function Posts({ admin }: { admin: Admin }) {
         <Form.Item name="title" label="标题" rules={[nonBlank('标题', 2, 40)]}><Input maxLength={40} showCount /></Form.Item>
         <Form.Item name="content" label="正文" rules={[nonBlank('正文', 2, 2000)]}><Input.TextArea rows={6} maxLength={2000} showCount /></Form.Item>
         <Form.Item name="tag" label="标签（可选）"><Input maxLength={80} /></Form.Item>
-        <Form.Item name="imageUrl" label="图片地址（可选）"><Input placeholder="https://..." maxLength={2048} /></Form.Item>
+        <Form.Item name="imageUrlsText" label="图片地址（可选，每行一个，最多9张）"><Input.TextArea rows={3} placeholder="每行一个 https://... 或云存储地址" maxLength={18432} /></Form.Item>
+        <Form.Item name="coverIndex" label="封面序号（从0开始）"><InputNumber min={0} max={8} precision={0} /></Form.Item>
         {editorType === 'event' && <><Form.Item name="location" label="活动地点" preserve={false} rules={[nonBlank('活动地点', 1, 200)]}><Input maxLength={200} /></Form.Item><Form.Item name="registrationDeadline" label="报名截止时间" preserve={false} rules={[{ required: true, message: '请选择报名截止时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="startsAt" label="开始时间" preserve={false} rules={[{ required: true, message: '请选择开始时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="endsAt" label="结束时间" preserve={false} rules={[{ required: true, message: '请选择结束时间' }]}><Input type="datetime-local" /></Form.Item><Form.Item name="capacity" label="报名人数上限" preserve={false} rules={[{ required: true, type: 'number', min: 1, message: '请输入至少 1 人' }]}><InputNumber min={1} precision={0} /></Form.Item>{editing && <><Form.Item name="eventStatus" label="活动状态"><Select options={[{ value: 'active', label: '正常' }, { value: 'changed', label: '已变更' }, { value: 'cancelled', label: '已取消' }]} /></Form.Item><Form.Item name="changeNote" label="变更说明"><Input.TextArea rows={3} maxLength={500} showCount placeholder="时间、地点或名额变化时填写" /></Form.Item><Form.Item name="cancellationReason" label="取消原因"><Input.TextArea rows={3} maxLength={500} showCount placeholder="取消活动时填写" /></Form.Item></>}</>}
         <Space><Button type="primary" htmlType="submit" loading={saving}>{editing ? '保存并提交审核' : '提交审核'}</Button><Button onClick={() => setEditorOpen(false)} disabled={saving}>取消</Button></Space>
       </Form>

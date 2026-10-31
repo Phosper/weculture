@@ -137,6 +137,15 @@
 - 小程序：作者页关注按钮、个人页通知入口和未读数、通知页加载／已读／全部已读／回到内容。微信订阅消息、系统推送、通知清理和后台通知管理未实现。
 - 本地检查：`test/follows-notifications.e2e-spec.ts`（关注、评论／回复、关注作者发布去重、活动变更、不可用对象、鉴权分页）、`test/follows-notifications-migration.e2e-spec.ts`（双表、唯一索引、回退、MySQL SQL）；小程序 `test/author-follow.test.js`、`test/notifications.test.js`。未部署、未访问真实 MySQL。
 
+## 多图与封面：2026-11-01 本地实现，待配套发布
+
+- `posts` 新增 `imageUrls`（text nullable，JSON 字符串数组）和 `coverIndex`（int 默认0）；迁移 `1793000005000-PostImages` 可逆；`imageUrl` 保留为封面别名。
+- `POST/PATCH /posts` 与后台 `saveAdminPost` 接受 `imageUrls: string[]`（0–9）和 `coverIndex`，兼容旧 `imageUrl`；服务端校验数组、非空字符串、每张最多2048字符、控制字符和封面范围。
+- `decoratePost`/`decorateAdminPost` 返回 `imageUrls`、`coverIndex`、`coverUrl`，并令 `imageUrl=coverUrl`；旧单图自动映射为一张。
+- 后台用“每行一个图片地址”编辑，封面序号从0开始；审核弹窗目前只预览封面。小程序发布页最多9张、移除、点图设封面、逐张上传；详情页显示封面和多图缩略条。
+- 未实现：独立 `post_images` 表、来源白名单、格式／大小校验、压缩、未使用云文件清理、后台逐张预览、拖动排序、上传成功 fileID 写入草稿。未真实云存储／MySQL、未部署。
+- 本地检查：`test/post-images.e2e-spec.ts`（多图、封面、旧单图、后台替换、边界校验）、`test/post-images-migration.e2e-spec.ts`（加列/回退/MySQL SQL）；小程序 `test/post-images.test.js`。
+
 ## 迁移与旧数据
 
 迁移 `1791417600000-PostCircles` 新增三个可空字段和圈层分页索引；只将旧 `visibility=school` 分类为 `campus`，保留学校、审核状态、原因、作者与投稿请求标识。
